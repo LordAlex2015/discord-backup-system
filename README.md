@@ -61,6 +61,7 @@ backup.backupInfo(backup_id, '/backup/').then(backupData => {
 | guild_base_id | Snowflake | Backup guild id |
 | owner_id | Snowflake | Backup Guild owner id |
 | author_id | Snowflake | Backup creator id |
+| exists | Bool | Return if file exists (If Not only exists will be in results) |
 
 ### Backup Delete
 ```js
@@ -84,6 +85,7 @@ backup.deleteBackup(backup_id, "/backup/");
 | ----- |------| ------- | 
 | deleted | Bool | Deleted or not | 
 | backup_id | String | Backup Id |
+| exists | Bool | Return if file exists (If Not only exists will be in results) |
 
 ### Load Backup
 ```js
@@ -110,4 +112,5 @@ backup.loadBackup(backup_id, message.guild, '/backup/');
 | reversed_roles | Collection | Roles Equivalent |
 | reversed_channels | Collection | Channels Equivalent |
 | bans | Array | All Bans |
+| exists | Bool | Return if file exists (If Not only exists will be in results) |
 
