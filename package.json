@@ -1,8 +1,8 @@
 {
   "name": "discord-backup-system",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Discord Backup System",
-  "main": "src/main.ts",
+  "main": "src/main.js",
   "scripts": {
     "test": "ts-node src/main.ts",
     "build": "tsc"
