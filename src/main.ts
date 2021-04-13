@@ -196,15 +196,13 @@ export function loadBackup(backup_id: String, guild: Guild, path = "/backup/") {
             guild.roles.cache.each((role: { managed: any; name: string; delete: () => void; }) => {
                 if (!role.managed && role.name !== '@everyone') {
                     setTimeout(function () {
-                        console.log(`Deleted ${role.name}`)
+                        //console.log(`Deleted ${role.name}`)
                         role.delete();
                     }, 100)
-                } else {
-                    console.log(`${role.name} is not deletable`)
                 }
             });
             for (const role of backup.roles) {
-                console.log(`Attempt to ${role.name}`)
+                //console.log(`Attempt to ${role.name}`)
                 if (!role.managed && role.name !== "@everyone") {
                     setTimeout(function () {
                         guild.roles.create({
@@ -217,7 +215,7 @@ export function loadBackup(backup_id: String, guild: Guild, path = "/backup/") {
                                 permissions: role.permissions
                             }
                         }).then((new_role) => {
-                            console.log(`Created ${role.name}`)
+                            //console.log(`Created ${role.name}`)
                             roles.set(role.id, {
                                 old_id: role.id,
                                 new_id: new_role.id
@@ -225,7 +223,7 @@ export function loadBackup(backup_id: String, guild: Guild, path = "/backup/") {
                             for (const member of role.members) {
                                 setTimeout(function () {
                                     // @ts-ignore
-                                    guild.members.cache.get(member.id).roles.add(new_role.id)
+                                    guild.members.cache.get(member.id).roles.add(new_role.id).catch((e) => {console.error(e)})
                                 }, 100)
                             }
                         })
@@ -234,7 +232,7 @@ export function loadBackup(backup_id: String, guild: Guild, path = "/backup/") {
                     guild.roles.everyone.edit({
                         permissions: role.permissions
                     }).then((new_role) => {
-                        console.log(`Created ${role.name}`)
+                        //console.log(`Created ${role.name}`)
                         roles.set(role.id, {
                             old_id: role.id,
                             new_id: new_role.id
@@ -252,7 +250,7 @@ export function loadBackup(backup_id: String, guild: Guild, path = "/backup/") {
                 });
                 // @ts-ignore
                 for (const channel of backup.channels) {
-                    console.log(`Attempt to ${channel.name}`)
+                    //console.log(`Attempt to ${channel.name}`)
                     if (channel.type === "category") {
                         setTimeout(function () {
                             let permissions = [];
@@ -269,7 +267,7 @@ export function loadBackup(backup_id: String, guild: Guild, path = "/backup/") {
                                     })
                                 }
                             }
-                            console.log(`Creating ${channel.name}`)
+                            //console.log(`Creating ${channel.name}`)
                             guild.channels.create(channel.name, {
                                 type: channel.type,
                                 position: channel.rawPosition,
@@ -286,7 +284,7 @@ export function loadBackup(backup_id: String, guild: Guild, path = "/backup/") {
                 setTimeout(function () {
                     // @ts-ignore
                     for (const channel of backup.channels) {
-                        console.log(`Attempt to ${channel.name}`)
+                        //console.log(`Attempt to ${channel.name}`)
                         if (channel.type !== "category") {
                             setTimeout(function () {
                                 let permissions = [];
@@ -304,7 +302,7 @@ export function loadBackup(backup_id: String, guild: Guild, path = "/backup/") {
                                         })
                                     }
                                 }
-                                console.log(`Creating ${channel.name}`)
+                                //console.log(`Creating ${channel.name}`)
                                 let parent = null;
                                 if(channels.get(channel.parentID)) {
                                     // @ts-ignore
