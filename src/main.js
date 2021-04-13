@@ -166,16 +166,13 @@ function loadBackup(backup_id, guild, path) {
             guild.roles.cache.each(function (role) {
                 if (!role.managed && role.name !== '@everyone') {
                     setTimeout(function () {
-                        console.log("Deleted " + role.name);
+                        //console.log(`Deleted ${role.name}`)
                         role["delete"]();
                     }, 100);
                 }
-                else {
-                    console.log(role.name + " is not deletable");
-                }
             });
             var _loop_1 = function (role) {
-                console.log("Attempt to " + role.name);
+                //console.log(`Attempt to ${role.name}`)
                 if (!role.managed && role.name !== "@everyone") {
                     setTimeout(function () {
                         guild.roles.create({
@@ -188,15 +185,16 @@ function loadBackup(backup_id, guild, path) {
                                 permissions: role.permissions
                             }
                         }).then(function (new_role) {
-                            console.log("Created " + role.name);
+                            //console.log(`Created ${role.name}`)
                             roles.set(role.id, {
                                 old_id: role.id,
                                 new_id: new_role.id
                             });
                             var _loop_4 = function (member) {
                                 setTimeout(function () {
+                                    var _a, _b;
                                     // @ts-ignore
-                                    guild.members.cache.get(member.id).roles.add(new_role.id);
+                                    (_b = (_a = guild.members.cache.get(member.id)) === null || _a === void 0 ? void 0 : _a.roles) === null || _b === void 0 ? void 0 : _b.add(new_role.id);
                                 }, 100);
                             };
                             for (var _i = 0, _a = role.members; _i < _a.length; _i++) {
@@ -210,7 +208,7 @@ function loadBackup(backup_id, guild, path) {
                     guild.roles.everyone.edit({
                         permissions: role.permissions
                     }).then(function (new_role) {
-                        console.log("Created " + role.name);
+                        //console.log(`Created ${role.name}`)
                         roles.set(role.id, {
                             old_id: role.id,
                             new_id: new_role.id
@@ -231,7 +229,7 @@ function loadBackup(backup_id, guild, path) {
                     }
                 });
                 var _loop_5 = function (channel) {
-                    console.log("Attempt to " + channel.name);
+                    //console.log(`Attempt to ${channel.name}`)
                     if (channel.type === "category") {
                         setTimeout(function () {
                             var permissions = [];
@@ -250,7 +248,7 @@ function loadBackup(backup_id, guild, path) {
                                     });
                                 }
                             }
-                            console.log("Creating " + channel.name);
+                            //console.log(`Creating ${channel.name}`)
                             guild.channels.create(channel.name, {
                                 type: channel.type,
                                 position: channel.rawPosition,
@@ -271,7 +269,7 @@ function loadBackup(backup_id, guild, path) {
                 }
                 setTimeout(function () {
                     var _loop_6 = function (channel) {
-                        console.log("Attempt to " + channel.name);
+                        //console.log(`Attempt to ${channel.name}`)
                         if (channel.type !== "category") {
                             setTimeout(function () {
                                 var permissions = [];
@@ -291,7 +289,7 @@ function loadBackup(backup_id, guild, path) {
                                         });
                                     }
                                 }
-                                console.log("Creating " + channel.name);
+                                //console.log(`Creating ${channel.name}`)
                                 var parent = null;
                                 if (channels.get(channel.parentID)) {
                                     // @ts-ignore

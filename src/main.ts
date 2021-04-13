@@ -223,7 +223,7 @@ export function loadBackup(backup_id: String, guild: Guild, path = "/backup/") {
                             for (const member of role.members) {
                                 setTimeout(function () {
                                     // @ts-ignore
-                                    guild.members.cache.get(member.id).roles.add(new_role.id).catch((e) => {console.error(e)})
+                                    guild.members.cache.get(member.id)?.roles?.add(new_role.id)
                                 }, 100)
                             }
                         })
