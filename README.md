@@ -40,7 +40,7 @@ const backup = require('discord-backup-system');
 // ... 
 // Your Message Event / Command
 backup.backupInfo(backup_id, '/backup/').then(backupData => {
-    message.channel.send(`Backup Size: ${Math.floor(backup.size)} MB`)
+    message.channel.send(`Backup Size: ${Math.floor(backupData.size)} MB`)
 });
 ```
 
@@ -91,7 +91,7 @@ const backup = require('discord-backup-system');
 
 // ... 
 // Your Message Event / Command
-backup.loadBackup(backup_id, guild, '/backup/');
+backup.loadBackup(backup_id, message.guild, '/backup/');
 ```
 
 #### Usage
