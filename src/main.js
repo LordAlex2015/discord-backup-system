@@ -238,7 +238,9 @@ function loadBackup(backup_id, guild, path) {
                         });
                     }
                 };
-                for (var _i = 0, _a = backup.roles; _i < _a.length; _i++) {
+                for (var _i = 0, _a = backup.roles.sort(function (a, b) {
+                    return b.rawPosition - a.rawPosition;
+                }); _i < _a.length; _i++) {
                     var role = _a[_i];
                     _loop_1(role);
                 }
@@ -285,7 +287,9 @@ function loadBackup(backup_id, guild, path) {
                         }
                     };
                     // @ts-ignore
-                    for (var _i = 0, _a = backup.channels; _i < _a.length; _i++) {
+                    for (var _i = 0, _a = backup.channels.sort(function (a, b) {
+                        return b.rawPosition - a.rawPosition;
+                    }); _i < _a.length; _i++) {
                         var channel = _a[_i];
                         _loop_5(channel);
                     }
@@ -332,7 +336,9 @@ function loadBackup(backup_id, guild, path) {
                             }
                         };
                         // @ts-ignore
-                        for (var _i = 0, _a = backup.channels; _i < _a.length; _i++) {
+                        for (var _i = 0, _a = backup.channels.sort(function (a, b) {
+                            return b.rawPosition - a.rawPosition;
+                        }); _i < _a.length; _i++) {
                             var channel = _a[_i];
                             _loop_6(channel);
                         }

@@ -220,7 +220,9 @@ export function loadBackup(backup_id: String, guild: Guild, path = "/backup/") {
                         }, 100)
                     }
                 });
-                for (const role of backup.roles) {
+                for (const role of backup.roles.sort(function (a: { rawPosition: number; }, b: { rawPosition: number; }) {
+                    return b.rawPosition - a.rawPosition;
+                })) {
                     //console.log(`Attempt to ${role.name}`)
                     if (!role.managed && role.name !== "@everyone") {
                         setTimeout(function () {
@@ -268,7 +270,9 @@ export function loadBackup(backup_id: String, guild: Guild, path = "/backup/") {
                         }
                     });
                     // @ts-ignore
-                    for (const channel of backup.channels) {
+                    for (const channel of backup.channels.sort(function (a: { rawPosition: number; }, b: { rawPosition: number; }) {
+                        return b.rawPosition - a.rawPosition;
+                    })) {
                         //console.log(`Attempt to ${channel.name}`)
                         if (channel.type === "category") {
                             setTimeout(function () {
@@ -302,7 +306,9 @@ export function loadBackup(backup_id: String, guild: Guild, path = "/backup/") {
                     }
                     setTimeout(function () {
                         // @ts-ignore
-                        for (const channel of backup.channels) {
+                        for (const channel of backup.channels.sort(function (a: { rawPosition: number; }, b: { rawPosition: number; }) {
+                            return b.rawPosition - a.rawPosition;
+                        })) {
                             //console.log(`Attempt to ${channel.name}`)
                             if (channel.type !== "category") {
                                 setTimeout(function () {
