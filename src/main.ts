@@ -261,94 +261,91 @@ export function loadBackup(backup_id: String, guild: Guild, path = "/backup/") {
                         })
                     }
                 }
-                setTimeout(function () {
-                    guild.channels.cache.each(channel => {
-                        if (channel.deletable) {
-                            setTimeout(function () {
-                                channel.delete();
-                            }, 100)
-                        }
-                    });
-                    // @ts-ignore
-                    for (const channel of backup.channels.sort(function (a: { rawPosition: number; }, b: { rawPosition: number; }) {
-                        return b.rawPosition - a.rawPosition;
-                    })) {
-                        //console.log(`Attempt to ${channel.name}`)
-                        if (channel.type === "category") {
-                            setTimeout(function () {
-                                let permissions = [];
-                                for (const permission of channel.permissionsOverwrites) {
-                                    if (!roles.get(permission.id)) {
-                                        continue;
-                                    } else {
-                                        permissions.push({
-                                            // @ts-ignore
-                                            id: `${roles.get(permission.id) ? roles.get(permission.id).new_id : null}`,
-                                            type: permission.type,
-                                            allow: permission.allow,
-                                            deny: permission.deny
-                                        })
-                                    }
-                                }
-                                //console.log(`Creating ${channel.name}`)
-                                guild.channels.create(channel.name, {
-                                    type: channel.type,
-                                    position: channel.rawPosition,
-                                    permissionOverwrites: permissions
-                                }).then((new_channel) => {
-                                    channels.set(channel.id, {
-                                        old_id: channel.id,
-                                        new_id: new_channel.id
-                                    })
-                                })
-                            }, 200)
-                        }
+                guild.channels.cache.each(channel => {
+                    if (channel.deletable) {
+                        setTimeout(function () {
+                            channel.delete();
+                        }, 100)
                     }
-                    setTimeout(function () {
-                        // @ts-ignore
-                        for (const channel of backup.channels.sort(function (a: { rawPosition: number; }, b: { rawPosition: number; }) {
-                            return b.rawPosition - a.rawPosition;
-                        })) {
-                            //console.log(`Attempt to ${channel.name}`)
-                            if (channel.type !== "category") {
-                                setTimeout(function () {
-                                    let permissions = [];
-                                    for (const permission of channel.permissionsOverwrites) {
-                                        if (!roles.get(permission.id)) {
-                                            continue;
-                                        } else {
-                                            // @ts-ignore
-                                            permissions.push({
-                                                // @ts-ignore
-                                                id: `${roles.get(permission.id) ? roles.get(permission.id).new_id : null}`,
-                                                type: permission.type,
-                                                allow: permission.allow,
-                                                deny: permission.deny
-                                            })
-                                        }
-                                    }
-                                    //console.log(`Creating ${channel.name}`)
-                                    let parent = null;
-                                    if (channels.get(channel.parentID)) {
+                });
+                // @ts-ignore
+                backup.channels.sort(function (a: { rawPosition: number; }, b: { rawPosition: number; }) {
+                    return b.rawPosition - a.rawPosition;
+                }).forEach((channel: { type: string; permissionsOverwrites: any; name: string; rawPosition: any; id: unknown; }) => {
+                    //console.log(`Attempt to ${channel.name}`)
+                    if (channel.type === "category") {
+                        setTimeout(function () {
+                            let permissions = [];
+                            for (const permission of channel.permissionsOverwrites) {
+                                if (!roles.get(permission.id)) {
+                                    continue;
+                                } else {
+                                    permissions.push({
                                         // @ts-ignore
-                                        parent = channels.get(channel.parentID).new_id;
-                                    }
-                                    guild.channels.create(channel.name, {
-                                        type: channel.type,
-                                        position: channel.rawPosition,
-                                        topic: channel.topic,
-                                        nsfw: channel.nsfw,
-                                        bitrate: channel.bitrate,
-                                        userLimit: channel.userLimit,
-                                        rateLimitPerUser: parseInt(`${channel.rateLimitPerUser !== '' ? channel.rateLimitPerUser : 0}`),
-                                        permissionOverwrites: permissions,
-                                        parent: parent
+                                        id: `${roles.get(permission.id) ? roles.get(permission.id).new_id : null}`,
+                                        type: permission.type,
+                                        allow: permission.allow,
+                                        deny: permission.deny
                                     })
-                                }, 200)
+                                }
                             }
-                        }
-                    }, 1000)
-                }, 3000)
+                            //console.log(`Creating ${channel.name}`)
+                            guild.channels.create(channel.name, {
+                                // @ts-ignore
+                                type: channel.type,
+                                position: channel.rawPosition,
+                                permissionOverwrites: permissions
+                            }).then((new_channel) => {
+                                channels.set(channel.id, {
+                                    old_id: channel.id,
+                                    new_id: new_channel.id
+                                })
+                            })
+                        }, 200)
+                    }
+                })
+                backup.channels.sort(function (a: { rawPosition: number; }, b: { rawPosition: number; }) {
+                    return b.rawPosition - a.rawPosition;
+                }).forEach((channel: { type: string; permissionsOverwrites: any; parentID: unknown; name: string; rawPosition: any; topic: any; nsfw: any; bitrate: any; userLimit: any; rateLimitPerUser: string; }) => {
+                    //console.log(`Attempt to ${channel.name}`)
+                    if (channel.type !== "category") {
+                        setTimeout(function () {
+                            let permissions = [];
+                            for (const permission of channel.permissionsOverwrites) {
+                                if (!roles.get(permission.id)) {
+                                    continue;
+                                } else {
+                                    // @ts-ignore
+                                    permissions.push({
+                                        // @ts-ignore
+                                        id: `${roles.get(permission.id) ? roles.get(permission.id).new_id : null}`,
+                                        type: permission.type,
+                                        allow: permission.allow,
+                                        deny: permission.deny
+                                    })
+                                }
+                            }
+                            //console.log(`Creating ${channel.name}`)
+                            let parent = null;
+                            if (channels.get(channel.parentID)) {
+                                // @ts-ignore
+                                parent = channels.get(channel.parentID).new_id;
+                            }
+                            guild.channels.create(channel.name, {
+                                // @ts-ignore
+                                type: channel.type,
+                                position: channel.rawPosition,
+                                topic: channel.topic,
+                                nsfw: channel.nsfw,
+                                bitrate: channel.bitrate,
+                                userLimit: channel.userLimit,
+                                rateLimitPerUser: parseInt(`${channel.rateLimitPerUser !== '' ? channel.rateLimitPerUser : 0}`),
+                                permissionOverwrites: permissions,
+                                parent: parent
+                            })
+                        }, 200)
+                    }
+                })
 
 
                 guild.emojis.cache.each(emoji => {
