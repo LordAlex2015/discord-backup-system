@@ -102,7 +102,8 @@ backup.loadBackup(backup_id, message.guild, '/backup/');
 | ----- |------| ------- | ----- |
 | backup_id | String |  Backup Id to give info | None |
 | guild | Guild | Guild to load backup | None |
-| path | String | Path to save the backup | /backup/ |
+| path | String | Path to save the backup | /backup/ 
+| debug | Bool | Debug Mode | false |
 
 #### Result
 

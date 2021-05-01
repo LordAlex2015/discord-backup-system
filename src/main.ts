@@ -3,6 +3,13 @@ import {existsSync, readFile, statSync, unlink, writeFile} from 'fs';
 
 declare const Buffer: { from: new (arg0: string) => string | NodeJS.ArrayBufferView; }
 
+function uuidv4(): string {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+        const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
+
 export function createBackup(guild: Guild, creatorID: string, path = "/backup/") {
     return new Promise((resolve) => {
         //base guild
@@ -163,7 +170,7 @@ export function backupInfo(backup_id: String, path = "/backup/") {
                 exists: false
             })
         } else {
-            const size = statSync(`${backup_id}.json`).size / (1024 * 1024);
+            const size = statSync(`${path}${backup_id}.json`).size / (1024 * 1024);
             readFile(`${path}${backup_id}.json`, 'utf8', function (err, data) {
                 if (err) return reject(err);
                 const data_json = JSON.parse(data);
@@ -173,7 +180,7 @@ export function backupInfo(backup_id: String, path = "/backup/") {
                     guild_base_id: data_json.backuper.id,
                     createdAt: data_json.backuper.createdAt,
                     owner_id: data_json.backuper.owner_id,
-                    author_id: data_json.backup.author_id,
+                    author_id: data_json.backuper.creatorId,
                     exists: true
                 })
             })
@@ -200,7 +207,8 @@ export function deleteBackup(backup_id: String, path = "/backup/") {
     })
 }
 
-export function loadBackup(backup_id: String, guild: Guild, path = "/backup/") {
+
+export function loadBackup(backup_id: String, guild: Guild, path = "/backup/", debug = false) {
     return new Promise((resolve, reject) => {
         if(!existsSync(`${path}${backup_id}.json`)) {
             resolve({
@@ -212,166 +220,283 @@ export function loadBackup(backup_id: String, guild: Guild, path = "/backup/") {
                 const backup = JSON.parse(data);
                 let roles = new Collection();
                 let channels = new Collection();
+                if(debug) console.log("Deleting roles...")
+                let i = 0;
+                const max_roo = guild.roles.cache.size;
                 guild.roles.cache.each((role: { managed: any; name: string; delete: () => void; }) => {
                     if (!role.managed && role.name !== '@everyone') {
                         setTimeout(function () {
-                            //console.log(`Deleted ${role.name}`)
+                            if(debug) console.log(`Deleted ${role.name} | ${i++}/${max_roo}`)
                             role.delete();
-                        }, 100)
+                            //i++
+                            if(i === max_roo) {
+                                if(debug) console.log("PART 1.1");
+                                part1_1();
+                            }
+                        }, 300)
+                    } else {
+                        i++
+                    }
+                    if(i === max_roo) {
+                        if(debug) console.log("PART 1.1");
+                        part1_1();
                     }
                 });
-                for (const role of backup.roles.sort(function (a: { rawPosition: number; }, b: { rawPosition: number; }) {
-                    return b.rawPosition - a.rawPosition;
-                })) {
-                    //console.log(`Attempt to ${role.name}`)
-                    if (!role.managed && role.name !== "@everyone") {
-                        setTimeout(function () {
-                            guild.roles.create({
-                                data: {
-                                    name: role.name,
-                                    color: role.color,
-                                    hoist: role.hoist,
-                                    mentionable: role.mentionable,
-                                    position: role.rawPosition,
-                                    permissions: role.permissions
-                                }
+
+                function part1_1() {
+                    let i = 0;
+                    if(debug) console.log("Creating roles...")
+                    const broles = backup.roles.sort(function (a: { rawPosition: number; }, b: { rawPosition: number; }) {
+                        return b.rawPosition - a.rawPosition;
+                    });
+                    for (const role of broles) {
+                        //console.log(`Attempt to ${role.name}`)
+                        if (!role.managed && role.name !== "@everyone") {
+                            setTimeout(function () {
+                                if(debug) console.log("Creating role...")
+                                guild.roles.create({
+                                    data: {
+                                        name: role.name,
+                                        color: role.color,
+                                        hoist: role.hoist,
+                                        mentionable: role.mentionable,
+                                        //position: role.rawPosition,
+                                        permissions: role.permissions
+                                    }
+                                }).then((new_role) => {
+                                    if(debug) console.log(`Created ${role.name} | ${i}/${broles.length}`)
+                                    roles.set(role.id, {
+                                        old_id: role.id,
+                                        new_id: new_role.id
+                                    });
+                                    i++
+                                    for (const member of role.members) {
+
+                                        if(!guild.members.cache.get(member.id)) {
+                                            continue;
+                                        } else {
+                                            setTimeout(function () {
+                                                // @ts-ignore
+                                                if(debug) console.log("Adding role")
+                                                guild.members.cache.get(member.id)?.roles?.add(new_role.id)
+                                            }, 200)
+                                        }
+                                    }
+
+                                    if(i === broles.length) {
+                                        if(debug) console.log("PART 2")
+                                        part2();
+                                    }
+                                })
+
+                            }, 400)
+                        } else if (role.name === '@everyone') {
+                            if(debug) console.log(`Passing everyone | ${i}/${broles.length}`)
+                            guild.roles.everyone.edit({
+                                permissions: role.permissions
                             }).then((new_role) => {
                                 //console.log(`Created ${role.name}`)
                                 roles.set(role.id, {
                                     old_id: role.id,
                                     new_id: new_role.id
                                 });
-                                for (const member of role.members) {
-                                    setTimeout(function () {
-                                        // @ts-ignore
-                                        guild.members.cache.get(member.id)?.roles?.add(new_role.id)
-                                    }, 100)
+                                i++;
+                                if(i === broles.length) {
+                                    if(debug) console.log("PART 2")
+                                    part2();
                                 }
                             })
-                        }, 200)
-                    } else if (role.name === '@everyone') {
-                        guild.roles.everyone.edit({
-                            permissions: role.permissions
-                        }).then((new_role) => {
-                            //console.log(`Created ${role.name}`)
-                            roles.set(role.id, {
-                                old_id: role.id,
-                                new_id: new_role.id
-                            });
-                        })
+                        } else if(role.managed) {
+                            if(debug) console.log(`Passing ${role.name} | ${i}/${broles.length}`)
+                            i++
+                            if(i === broles.length) {
+                                if(debug) console.log("PART 2")
+                                part2();
+                            }
+                        }
+                        if(i === broles.length) {
+                            if(debug) console.log("PART 2")
+                            part2();
+                        }
                     }
                 }
-                guild.channels.cache.each(channel => {
-                    if (channel.deletable) {
-                        setTimeout(function () {
-                            channel.delete();
-                        }, 100)
-                    }
-                });
-                // @ts-ignore
-                backup.channels.sort(function (a: { rawPosition: number; }, b: { rawPosition: number; }) {
-                    return b.rawPosition - a.rawPosition;
-                }).forEach((channel: { type: string; permissionsOverwrites: any; name: string; rawPosition: any; id: unknown; }) => {
-                    //console.log(`Attempt to ${channel.name}`)
-                    if (channel.type === "category") {
-                        setTimeout(function () {
-                            let permissions = [];
-                            for (const permission of channel.permissionsOverwrites) {
-                                if (!roles.get(permission.id)) {
-                                    continue;
-                                } else {
-                                    permissions.push({
-                                        // @ts-ignore
-                                        id: `${roles.get(permission.id) ? roles.get(permission.id).new_id : null}`,
-                                        type: permission.type,
-                                        allow: permission.allow,
-                                        deny: permission.deny
-                                    })
+
+                function part2() {
+                    if(debug) console.log("Deleting Channels...")
+                    const max_chan = guild.channels.cache.size;
+                    let io = 0;
+                    guild.channels.cache.each(channel => {
+                        if (channel.deletable) {
+                            setTimeout(function () {
+                                io++
+                                if(debug) console.log(`Deleted ${channel.name} | ${io}/${max_chan}`)
+                                channel.delete();
+                                //io++
+                                if(io === max_chan-1) {
+                                    if(debug) console.log("PART 2.1")
+                                    part2_1();
                                 }
-                            }
-                            //console.log(`Creating ${channel.name}`)
-                            guild.channels.create(channel.name, {
-                                // @ts-ignore
-                                type: channel.type,
-                                position: channel.rawPosition,
-                                permissionOverwrites: permissions
-                            }).then((new_channel) => {
-                                channels.set(channel.id, {
-                                    old_id: channel.id,
-                                    new_id: new_channel.id
-                                })
-                            })
-                        }, 200)
-                    }
-                })
-                backup.channels.sort(function (a: { rawPosition: number; }, b: { rawPosition: number; }) {
-                    return b.rawPosition - a.rawPosition;
-                }).forEach((channel: { type: string; permissionsOverwrites: any; parentID: unknown; name: string; rawPosition: any; topic: any; nsfw: any; bitrate: any; userLimit: any; rateLimitPerUser: string; }) => {
-                    //console.log(`Attempt to ${channel.name}`)
-                    if (channel.type !== "category") {
-                        setTimeout(function () {
-                            let permissions = [];
-                            for (const permission of channel.permissionsOverwrites) {
-                                if (!roles.get(permission.id)) {
-                                    continue;
-                                } else {
+                            }, 300)
+                        }
+                        if(io === max_chan-1) {
+                            if(debug) console.log("PART 2.1")
+                            part2_1();
+                        }
+                    });
+
+                }
+                function part2_1() {
+                    let i = 0;
+                    // @ts-ignore
+                    const bchannels = backup.channels.sort(function (a: { rawPosition: number; }, b: { rawPosition: number; }) {
+                        return b.rawPosition - a.rawPosition;
+                    });
+                    bchannels.forEach((channel: { type: string; permissionsOverwrites: any; name: string; rawPosition: any; id: unknown; }) => {
+                        //console.log(`Attempt to ${channel.name}`)
+                        if (channel.type === "category") {
+                            setTimeout(function () {
+                                let permissions = [];
+                                for (const permission of channel.permissionsOverwrites) {
+                                    if (!roles.get(permission.id)) {
+                                        continue;
+                                    } else {
+                                        permissions.push({
+                                            // @ts-ignore
+                                            id: `${roles.get(permission.id) ? roles.get(permission.id).new_id : null}`,
+                                            type: permission.type,
+                                            allow: permission.allow,
+                                            deny: permission.deny
+                                        })
+                                    }
+                                }
+                                //console.log(`Creating ${channel.name}`)
+                                guild.channels.create(channel.name, {
                                     // @ts-ignore
-                                    permissions.push({
-                                        // @ts-ignore
-                                        id: `${roles.get(permission.id) ? roles.get(permission.id).new_id : null}`,
-                                        type: permission.type,
-                                        allow: permission.allow,
-                                        deny: permission.deny
+                                    type: channel.type,
+                                    position: channel.rawPosition,
+                                    permissionOverwrites: permissions
+                                }).then((new_channel) => {
+                                    channels.set(channel.id, {
+                                        old_id: channel.id,
+                                        new_id: new_channel.id
                                     })
+                                    i++
+                                    if(i === bchannels.length) {
+                                        if(debug) console.log("PART 2.2")
+                                        part2_2();
+                                    }
+                                })
+                            }, 400)
+                        } else {
+                            i++
+                        }
+                        if(i === bchannels.length) {
+                            if(debug) console.log("PART 2.2")
+                            part2_2();
+                        }
+                    })
+                }
+                function part2_2() {
+                    let i = 0;
+                    const bchannels = backup.channels.sort(function (a: { rawPosition: number; }, b: { rawPosition: number; }) {
+                        return a.rawPosition - b.rawPosition;
+                    });
+                    bchannels.forEach((channel: { type: string; permissionsOverwrites: any; parentID: unknown; name: string; rawPosition: any; topic: any; nsfw: any; bitrate: any; userLimit: any; rateLimitPerUser: string; }) => {
+                        //console.log(`Attempt to ${channel.name}`)
+                        if (channel.type !== "category") {
+                            setTimeout(function () {
+                                let permissions = [];
+                                for (const permission of channel.permissionsOverwrites) {
+                                    if (!roles.get(permission.id)) {
+                                        continue;
+                                    } else {
+                                        // @ts-ignore
+                                        permissions.push({
+                                            // @ts-ignore
+                                            id: `${roles.get(permission.id) ? roles.get(permission.id).new_id : null}`,
+                                            type: permission.type,
+                                            allow: permission.allow,
+                                            deny: permission.deny
+                                        })
+                                    }
                                 }
-                            }
-                            //console.log(`Creating ${channel.name}`)
-                            let parent = null;
-                            if (channels.get(channel.parentID)) {
-                                // @ts-ignore
-                                parent = channels.get(channel.parentID).new_id;
-                            }
-                            guild.channels.create(channel.name, {
-                                // @ts-ignore
-                                type: channel.type,
-                                position: channel.rawPosition,
-                                topic: channel.topic,
-                                nsfw: channel.nsfw,
-                                bitrate: channel.bitrate,
-                                userLimit: channel.userLimit,
-                                rateLimitPerUser: parseInt(`${channel.rateLimitPerUser !== '' ? channel.rateLimitPerUser : 0}`),
-                                permissionOverwrites: permissions,
-                                parent: parent
-                            })
-                        }, 200)
+                                //console.log(`Creating ${channel.name}`)
+                                let parent = null;
+                                if (channels.get(channel.parentID)) {
+                                    // @ts-ignore
+                                    parent = channels.get(channel.parentID).new_id;
+                                }
+                                if(channel.type.toLowerCase() === "news") {
+                                    channel.type = "text"
+                                }
+                                //console.log(channel.type)
+                                guild.channels.create(channel.name, {
+                                    // @ts-ignore
+                                    type: channel.type,
+                                    //position: channel.rawPosition,
+                                    topic: channel.topic,
+                                    nsfw: channel.nsfw,
+                                    bitrate: channel.bitrate,
+                                    userLimit: channel.userLimit,
+                                    rateLimitPerUser: parseInt(`${channel.rateLimitPerUser !== '' ? channel.rateLimitPerUser : 0}`),
+                                    permissionOverwrites: permissions,
+                                    parent: parent
+                                })
+                                i++
+                                if(i === bchannels.length) {
+                                    if(debug) console.log("PART 3")
+                                    part3();
+                                }
+                            }, 400)
+                        } else {
+                            i++
+
+                        }
+                        if(i === bchannels.length) {
+                            if(debug) console.log("PART 3")
+                            part3();
+                        }
+                    })
+                }
+
+                function part3() {
+                    let ie = 0;
+                    const max_emot = guild.emojis.cache.size;
+                    guild.emojis.cache.each(emoji => {
+                        if (emoji.deletable) {
+                            setTimeout(function () {
+                                emoji.delete();
+                                ie++;
+                                if(ie === max_emot-1) {
+                                    if(debug) console.log("PART 3.1");
+                                    part3_1();
+                                }
+                            }, 100)
+                        }
+                    });
+                    if(ie === max_emot) {
+                        if(debug) console.log("PART 3.1");
+                        part3_1();
                     }
-                })
 
+                }
 
-                guild.emojis.cache.each(emoji => {
-                    if (emoji.deletable) {
+                function part3_1() {
+                    for (const emoji of backup.emoji) {
                         setTimeout(function () {
-                            emoji.delete();
+                            guild.emojis.create(emoji.url, emoji.name, {
+                                roles: emoji.roles || []
+                            })
                         }, 100)
                     }
-                });
-                for (const emoji of backup.emoji) {
-                    setTimeout(function () {
-                        guild.emojis.create(emoji.url, emoji.name, {
-                            roles: emoji.roles
-                        })
-                    }, 100)
-                }
 
-                for (const ban of backup.bans) {
-                    setTimeout(function () {
-                        guild.members.ban(ban.id, {
-                            reason: ban.reason
-                        })
-                    }, 100)
-                }
-
-                setTimeout(function () {
+                    for (const ban of backup.bans) {
+                        setTimeout(function () {
+                            guild.members.ban(ban.id, {
+                                reason: ban.reason
+                            })
+                        }, 100)
+                    }
                     let afkChannel = null;
                     let systemChannel = null;
                     let rulesChannel = null;
@@ -419,15 +544,9 @@ export function loadBackup(backup_id: String, guild: Guild, path = "/backup/") {
                         bans: backup.bans,
                         exists: true
                     })
-                }, 10000)
+                }
+
             })
         }
     })
-}
-
-function uuidv4(): string {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-        const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-    });
 }
