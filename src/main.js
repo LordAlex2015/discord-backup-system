@@ -1,8 +1,9 @@
 "use strict";
 exports.__esModule = true;
-exports.loadBackup = exports.deleteBackup = exports.backupInfo = exports.createBackup = void 0;
+exports.getAllBackups = exports.getBackupRAW = exports.loadBackup = exports.deleteBackup = exports.backupInfo = exports.createBackup = void 0;
 var discord_js_1 = require("discord.js");
 var fs_1 = require("fs");
+var path_1 = require("path");
 function uuidv4() {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
         var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
@@ -117,11 +118,13 @@ function createBackup(guild, creatorID, path) {
         });
         var backup_id = uuidv4();
         //Create Backup
-        fs_1.writeFile("" + path + backup_id + ".json", new Buffer.from(JSON.stringify(guild_backup)), 'utf8', function () {
+        // @ts-ignore
+        fs_1.writeFile("" + path_1.dirname(require.main.filename) + path + backup_id + ".json", new Buffer.from(JSON.stringify(guild_backup)), 'utf8', function () {
         });
         resolve({
             id: backup_id,
-            path: "" + path + backup_id + ".json"
+            // @ts-ignore
+            path: "" + path_1.dirname(require.main.filename) + path + backup_id + ".json"
         });
     });
 }
@@ -129,14 +132,17 @@ exports.createBackup = createBackup;
 function backupInfo(backup_id, path) {
     if (path === void 0) { path = "/backup/"; }
     return new Promise(function (resolve, reject) {
-        if (!fs_1.existsSync("" + path + backup_id + ".json")) {
+        // @ts-ignore
+        if (!fs_1.existsSync("" + path_1.dirname(require.main.filename) + path + backup_id + ".json")) {
             resolve({
                 exists: false
             });
         }
         else {
-            var size_1 = fs_1.statSync("" + path + backup_id + ".json").size / (1024 * 1024);
-            fs_1.readFile("" + path + backup_id + ".json", 'utf8', function (err, data) {
+            // @ts-ignore
+            var size_1 = fs_1.statSync("" + path_1.dirname(require.main.filename) + path + backup_id + ".json").size / (1024 * 1024);
+            // @ts-ignore
+            fs_1.readFile("" + path_1.dirname(require.main.filename) + path + backup_id + ".json", 'utf8', function (err, data) {
                 if (err)
                     return reject(err);
                 var data_json = JSON.parse(data);
@@ -157,13 +163,15 @@ exports.backupInfo = backupInfo;
 function deleteBackup(backup_id, path) {
     if (path === void 0) { path = "/backup/"; }
     return new Promise(function (resolve, reject) {
-        if (!fs_1.existsSync("" + path + backup_id + ".json")) {
+        // @ts-ignore
+        if (!fs_1.existsSync("" + path_1.dirname(require.main.filename) + path + backup_id + ".json")) {
             resolve({
                 exists: false
             });
         }
         else {
-            fs_1.unlink("" + path + backup_id + ".json", function (err) {
+            // @ts-ignore
+            fs_1.unlink("" + path_1.dirname(require.main.filename) + path + backup_id + ".json", function (err) {
                 if (err)
                     return reject(err);
                 resolve({
@@ -180,13 +188,15 @@ function loadBackup(backup_id, guild, path, debug) {
     if (path === void 0) { path = "/backup/"; }
     if (debug === void 0) { debug = false; }
     return new Promise(function (resolve, reject) {
-        if (!fs_1.existsSync("" + path + backup_id + ".json")) {
+        // @ts-ignore
+        if (!fs_1.existsSync("" + path_1.dirname(require.main.filename) + path + backup_id + ".json")) {
             resolve({
                 exists: false
             });
         }
         else {
-            fs_1.readFile("" + path + backup_id + ".json", 'utf8', function (err, data) {
+            // @ts-ignore
+            fs_1.readFile("" + path_1.dirname(require.main.filename) + path + backup_id + ".json", 'utf8', function (err, data) {
                 if (err)
                     return reject(err);
                 var backup = JSON.parse(data);
@@ -560,3 +570,102 @@ function loadBackup(backup_id, guild, path, debug) {
     });
 }
 exports.loadBackup = loadBackup;
+function getBackupRAW(backup_id, path) {
+    if (path === void 0) { path = "/backup/"; }
+    return new Promise(function (resolve, reject) {
+        // @ts-ignore
+        if (!fs_1.existsSync("" + path_1.dirname(require.main.filename) + path + backup_id + ".json")) {
+            resolve({
+                exists: false
+            });
+        }
+        else {
+            // @ts-ignore
+            fs_1.readFile("" + path_1.dirname(require.main.filename) + path + backup_id + ".json", 'utf8', function (err, data) {
+                if (err)
+                    return reject(err);
+                var data_json = JSON.parse(data);
+                resolve({
+                    backup_id: backup_id,
+                    // @ts-ignore
+                    path: "" + path_1.dirname(require.main.filename) + path + backup_id + ".json",
+                    backup: data_json,
+                    exists: true
+                });
+            });
+        }
+    });
+}
+exports.getBackupRAW = getBackupRAW;
+function getAllBackups(path) {
+    if (path === void 0) { path = '/backup/'; }
+    return new Promise(function (resolve) {
+        // @ts-ignore
+        var files = fs_1.readdirSync("" + path_1.dirname(require.main.filename) + path);
+        var backups = [];
+        var start = Date.now();
+        var count = 0;
+        var count2 = 0;
+        var count3 = 0;
+        files.forEach(function (e) {
+            try {
+                var fileName_1 = e.split('.')[0];
+                if (e.endsWith('json')) {
+                    count3++;
+                }
+                if (e.endsWith('json')) {
+                    // @ts-ignore
+                    var size_2 = fs_1.statSync("" + path_1.dirname(require.main.filename) + path + fileName_1 + ".json").size / (1024 * 1024);
+                    console.log("H");
+                    // @ts-ignore
+                    fs_1.readFile("" + path_1.dirname(require.main.filename) + path + fileName_1 + ".json", 'utf8', function (err, data) {
+                        if (err)
+                            return console.error(err);
+                        console.log("HE");
+                        var data_json = JSON.parse(data);
+                        backups.push({
+                            backup_id: fileName_1,
+                            // @ts-ignore
+                            path: "" + path_1.dirname(require.main.filename) + path + fileName_1 + ".json",
+                            guild_base_id: data_json.backuper.id,
+                            createdAt: data_json.backuper.createdAt,
+                            owner_id: data_json.backuper.owner_id,
+                            author_id: data_json.backuper.creatorId,
+                            size: size_2
+                        });
+                        console.log("HEY");
+                        count++;
+                        count2++;
+                        if (count2 === files.length && count3 === count3) {
+                            var finish = Date.now();
+                            resolve({
+                                backups: backups,
+                                time_elapsed: finish - start,
+                                fetched_backups: count,
+                                fetched_files: count2,
+                                fetched_json_files: count3
+                            });
+                        }
+                    });
+                }
+                else {
+                    count2++;
+                }
+                if (count2 === files.length && count3 === count3) {
+                    var finish = Date.now();
+                    resolve({
+                        backups: backups,
+                        time_elapsed: finish - start,
+                        fetched_backups: count,
+                        fetched_files: count2,
+                        fetched_json_files: count3
+                    });
+                }
+            }
+            catch (error) {
+                throw new Error("Failed to fetch file " + e + ": " + (error.stack || error));
+            }
+        });
+    });
+}
+exports.getAllBackups = getAllBackups;

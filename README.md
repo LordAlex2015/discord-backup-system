@@ -63,6 +63,55 @@ backup.backupInfo(backup_id, '/backup/').then(backupData => {
 | author_id | Snowflake | Backup creator id |
 | exists | Bool | Return if file exists (If Not only exists will be in results) |
 
+### Raw Backup Info
+```js
+const backup = require('discord-backup-system');
+
+// ... 
+// Your Message Event / Command
+backup.getBackupRAW(backup_id, message.guild, '/backup/');
+```
+
+#### Usage
+
+| Usage Params | Type | Explication | Default |
+| ----- |------| ------- | ----- |
+| backup_id | String |  Backup Id to give info | None |
+| path | String | Path to save the backup | /backup/ |
+
+#### Result
+
+| Result Params | Type | Explication | 
+| ----- |------| ------- |
+| backup_id | String | Backup Id |
+| path | String | Backup file path |
+| backup | Object | Backup file content |
+| exists | Bool | Return if file exists (If Not only exists will be in results) |
+
+### Get All Backups
+```js
+const backup = require('discord-backup-system');
+
+// ... 
+// Your Message Event / Command
+backup.getAllBackups(backup_id, message.guild, '/backup/');
+```
+
+#### Usage
+
+| Usage Params | Type | Explication | Default |
+| ----- |------| ------- | ----- |
+| path | String | Path to save the backup | /backup/ |
+
+#### Result
+
+| Result Params | Type | Explication | 
+| ----- |------| ------- |
+| backups | Array | Array of backups infos (Same as backupInfo) |
+| time_elapsed | Number | Backup file path |
+| fetched | Number | Total of backup files fetched |
+
+
 ### Backup Delete
 ```js
 const backup = require('discord-backup-system');

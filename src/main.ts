@@ -1,5 +1,6 @@
 import {Collection, DefaultMessageNotifications, Guild, SystemChannelFlags, UserFlags} from 'discord.js';
-import {existsSync, readFile, statSync, unlink, writeFile} from 'fs';
+import {existsSync, readFile, statSync, unlink, writeFile, readdirSync, readFileSync} from 'fs';
+import {dirname} from 'path';
 
 declare const Buffer: { from: new (arg0: string) => string | NodeJS.ArrayBufferView; }
 
@@ -153,25 +154,30 @@ export function createBackup(guild: Guild, creatorID: string, path = "/backup/")
 
         const backup_id = uuidv4();
         //Create Backup
-        writeFile(`${path}${backup_id}.json`, new Buffer.from(JSON.stringify(guild_backup)), 'utf8', function () {
+        // @ts-ignore
+        writeFile(`${dirname(require.main.filename)}${path}${backup_id}.json`, new Buffer.from(JSON.stringify(guild_backup)), 'utf8', function () {
         });
 
         resolve({
             id: backup_id,
-            path: `${path}${backup_id}.json`
+            // @ts-ignore
+            path: `${dirname(require.main.filename)}${path}${backup_id}.json`
         })
     })
 }
 
 export function backupInfo(backup_id: String, path = "/backup/") {
     return new Promise((resolve, reject) => {
-        if(!existsSync(`${path}${backup_id}.json`)) {
+        // @ts-ignore
+        if(!existsSync(`${dirname(require.main.filename)}${path}${backup_id}.json`)) {
             resolve({
                 exists: false
             })
         } else {
-            const size = statSync(`${path}${backup_id}.json`).size / (1024 * 1024);
-            readFile(`${path}${backup_id}.json`, 'utf8', function (err, data) {
+            // @ts-ignore
+            const size = statSync(`${dirname(require.main.filename)}${path}${backup_id}.json`).size / (1024 * 1024);
+            // @ts-ignore
+            readFile(`${dirname(require.main.filename)}${path}${backup_id}.json`, 'utf8', function (err, data) {
                 if (err) return reject(err);
                 const data_json = JSON.parse(data);
                 resolve({
@@ -190,12 +196,14 @@ export function backupInfo(backup_id: String, path = "/backup/") {
 
 export function deleteBackup(backup_id: String, path = "/backup/") {
     return new Promise((resolve, reject) => {
-        if(!existsSync(`${path}${backup_id}.json`)) {
+        // @ts-ignore
+        if(!existsSync(`${dirname(require.main.filename)}${path}${backup_id}.json`)) {
             resolve({
                 exists: false
             })
         } else {
-            unlink(`${path}${backup_id}.json`, (err) => {
+            // @ts-ignore
+            unlink(`${dirname(require.main.filename)}${path}${backup_id}.json`, (err) => {
                 if (err) return reject(err);
                 resolve({
                     backup_id: backup_id,
@@ -207,15 +215,16 @@ export function deleteBackup(backup_id: String, path = "/backup/") {
     })
 }
 
-
 export function loadBackup(backup_id: String, guild: Guild, path = "/backup/", debug = false) {
     return new Promise((resolve, reject) => {
-        if(!existsSync(`${path}${backup_id}.json`)) {
+        // @ts-ignore
+        if(!existsSync(`${dirname(require.main.filename)}${path}${backup_id}.json`)) {
             resolve({
                 exists: false
             })
         } else {
-            readFile(`${path}${backup_id}.json`, 'utf8', function (err, data) {
+            // @ts-ignore
+            readFile(`${dirname(require.main.filename)}${path}${backup_id}.json`, 'utf8', function (err, data) {
                 if (err) return reject(err);
                 const backup = JSON.parse(data);
                 let roles = new Collection();
@@ -548,5 +557,102 @@ export function loadBackup(backup_id: String, guild: Guild, path = "/backup/", d
 
             })
         }
+    })
+}
+
+export function getBackupRAW(backup_id: String, path = "/backup/") {
+    return new Promise((resolve, reject) => {
+        // @ts-ignore
+        if(!existsSync(`${dirname(require.main.filename)}${path}${backup_id}.json`)) {
+            resolve({
+                exists: false
+            })
+        } else {
+            // @ts-ignore
+            readFile(`${dirname(require.main.filename)}${path}${backup_id}.json`, 'utf8', function (err, data) {
+                if (err) return reject(err);
+                const data_json = JSON.parse(data);
+                resolve({
+                    backup_id: backup_id,
+                    // @ts-ignore
+                    path: `${dirname(require.main.filename)}${path}${backup_id}.json`,
+                    backup: data_json,
+                    exists: true
+                })
+            })
+        }
+    })
+}
+
+export function getAllBackups(path = '/backup/') {
+    return new Promise(resolve => {
+        // @ts-ignore
+        const files = readdirSync(`${dirname(require.main.filename)}${path}`);
+        let backups: {
+            backup_id: string;
+            // @ts-ignore
+            path: string; guild_base_id: string; createdAt: string; owner_id: string; author_id: string; size: number;
+        }[] = [];
+        const start = Date.now()
+        let count = 0
+        let count2 = 0
+        let count3 = 0
+        files.forEach((e) => {
+            try {
+                const fileName = e.split('.')[0];
+                if(e.endsWith('json')) {
+                    count3++
+                }
+                if(e.endsWith('json')) {
+                    // @ts-ignore
+                    const size = statSync(`${dirname(require.main.filename)}${path}${fileName}.json`).size / (1024 * 1024);
+                console.log("H")
+                    // @ts-ignore
+                   readFile(`${dirname(require.main.filename)}${path}${fileName}.json`, 'utf8', function(err, data) {
+                        if (err) return console.error(err);
+                        console.log("HE")
+                        const data_json = JSON.parse(data);
+                        backups.push({
+                            backup_id: fileName,
+                            // @ts-ignore
+                            path: `${dirname(require.main.filename)}${path}${fileName}.json`,
+                            guild_base_id: data_json.backuper.id,
+                            createdAt: data_json.backuper.createdAt,
+                            owner_id: data_json.backuper.owner_id,
+                            author_id: data_json.backuper.creatorId,
+                            size: size
+                        })
+                       console.log("HEY")
+                        count++
+                         count2++
+                       if(count2 === files.length && count3 === count3) {
+                           const finish = Date.now()
+                           resolve({
+                               backups: backups,
+                               time_elapsed: finish - start,
+                               fetched_backups: count,
+                               fetched_files: count2,
+                               fetched_json_files: count3
+                           })
+                       }
+                    })
+                } else {
+                    count2++
+                }
+                if(count2 === files.length && count3 === count3) {
+                    const finish = Date.now()
+                    resolve({
+                        backups: backups,
+                        time_elapsed: finish - start,
+                        fetched_backups: count,
+                        fetched_files: count2,
+                        fetched_json_files: count3
+                    })
+                }
+            } catch (error) {
+                throw new Error(`Failed to fetch file ${e}: ${error.stack || error}`)
+            }
+        });
+
     })
 }
