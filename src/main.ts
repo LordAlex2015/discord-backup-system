@@ -10,11 +10,22 @@ function uuidv4(): string {
         return v.toString(16);
     });
 }
+function uuid_short(): string {
+    return 'xxxxxxx-xxx-xxxxxxx'.replace(/[xy]/g, function (c) {
+        const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
 
-export function createBackup(guild: Guild, creatorID: string, path = "/backup/") {
+export function createBackup(guild: Guild, creatorID: string, path: string = "/backup/", name: string = "#{GEN}#") {
     return new Promise((resolve) => {
+        // @ts-ignore
+        if (existsSync(`${dirname(require.main.filename)}${path}${name}.axbs1`)) {
+            throw new Error("Backup already exist!")
+        }
         //base guild
         let guild_backup: {
+            version: number,
             backuper: {
                 id: string,
                 owner_id: string,
@@ -38,13 +49,14 @@ export function createBackup(guild: Guild, creatorID: string, path = "/backup/")
             description: string | null,
             banner: string | null,
             rulesChannelID: string | null,
-            publicUpdatesChannelID:string | null,
+            publicUpdatesChannelID: string | null,
             preferredLocale: string,
             roles: any[],
             channels: any[],
             emoji: any[],
             bans: any[]
         } = {
+            version: 1,
             backuper: {
                 id: guild.id,
                 owner_id: guild.ownerID,
@@ -152,32 +164,32 @@ export function createBackup(guild: Guild, creatorID: string, path = "/backup/")
             })
         })
 
-        const backup_id = uuidv4();
+        const backup_id = name.replace(/#{GEN}#/g, uuidv4()).replace(/#{GEN_SHORT}#/g, uuid_short());
         //Create Backup
         // @ts-ignore
-        writeFile(`${dirname(require.main.filename)}${path}${backup_id}.json`, new Buffer.from(JSON.stringify(guild_backup)), 'utf8', function () {
+        writeFile(`${dirname(require.main.filename)}${path}${backup_id}.axbs1`, new Buffer.from(JSON.stringify(guild_backup)), 'utf8', function () {
         });
 
         resolve({
             id: backup_id,
             // @ts-ignore
-            path: `${dirname(require.main.filename)}${path}${backup_id}.json`
+            path: `${dirname(require.main.filename)}${path}${backup_id}.axbs1`
         })
     })
 }
 
-export function backupInfo(backup_id: String, path = "/backup/") {
+export function backupInfo(backup_id: String, path: string = "/backup/") {
     return new Promise((resolve, reject) => {
         // @ts-ignore
-        if(!existsSync(`${dirname(require.main.filename)}${path}${backup_id}.json`)) {
+        if (!existsSync(`${dirname(require.main.filename)}${path}${backup_id}.axbs1`)) {
             resolve({
                 exists: false
             })
         } else {
             // @ts-ignore
-            const size = statSync(`${dirname(require.main.filename)}${path}${backup_id}.json`).size / (1024 * 1024);
+            const size = statSync(`${dirname(require.main.filename)}${path}${backup_id}.axbs1`).size / (1024 * 1024);
             // @ts-ignore
-            readFile(`${dirname(require.main.filename)}${path}${backup_id}.json`, 'utf8', function (err, data) {
+            readFile(`${dirname(require.main.filename)}${path}${backup_id}.axbs1`, 'utf8', function (err, data) {
                 if (err) return reject(err);
                 const data_json = JSON.parse(data);
                 resolve({
@@ -194,16 +206,16 @@ export function backupInfo(backup_id: String, path = "/backup/") {
     })
 }
 
-export function deleteBackup(backup_id: String, path = "/backup/") {
+export function deleteBackup(backup_id: String, path: string = "/backup/") {
     return new Promise((resolve, reject) => {
         // @ts-ignore
-        if(!existsSync(`${dirname(require.main.filename)}${path}${backup_id}.json`)) {
+        if (!existsSync(`${dirname(require.main.filename)}${path}${backup_id}.axbs1`)) {
             resolve({
                 exists: false
             })
         } else {
             // @ts-ignore
-            unlink(`${dirname(require.main.filename)}${path}${backup_id}.json`, (err) => {
+            unlink(`${dirname(require.main.filename)}${path}${backup_id}.axbs1`, (err) => {
                 if (err) return reject(err);
                 resolve({
                     backup_id: backup_id,
@@ -215,46 +227,46 @@ export function deleteBackup(backup_id: String, path = "/backup/") {
     })
 }
 
-export function loadBackup(backup_id: String, guild: Guild, path = "/backup/", debug = false) {
+export function loadBackup(backup_id: String, guild: Guild, path: string = "/backup/", debug = false) {
     return new Promise((resolve, reject) => {
         // @ts-ignore
-        if(!existsSync(`${dirname(require.main.filename)}${path}${backup_id}.json`)) {
+        if (!existsSync(`${dirname(require.main.filename)}${path}${backup_id}.axbs1`)) {
             resolve({
                 exists: false
             })
         } else {
             // @ts-ignore
-            readFile(`${dirname(require.main.filename)}${path}${backup_id}.json`, 'utf8', function (err, data) {
+            readFile(`${dirname(require.main.filename)}${path}${backup_id}.axbs1`, 'utf8', function (err, data) {
                 if (err) return reject(err);
                 const backup = JSON.parse(data);
                 let roles = new Collection();
                 let channels = new Collection();
-                if(debug) console.log("Deleting roles...")
+                if (debug) console.log("Deleting roles...")
                 let i = 0;
                 const max_roo = guild.roles.cache.size;
                 guild.roles.cache.each((role: { managed: any; name: string; delete: () => void; }) => {
                     if (!role.managed && role.name !== '@everyone') {
                         setTimeout(function () {
-                            if(debug) console.log(`Deleted ${role.name} | ${i++}/${max_roo}`)
+                            if (debug) console.log(`Deleted ${role.name} | ${i++}/${max_roo}`)
                             role.delete();
                             //i++
-                            if(i === max_roo) {
-                                if(debug) console.log("PART 1.1");
+                            if (i === max_roo) {
+                                if (debug) console.log("PART 1.1");
                                 part1_1();
                             }
                         }, 300)
                     } else {
                         i++
                     }
-                    if(i === max_roo) {
-                        if(debug) console.log("PART 1.1");
+                    if (i === max_roo) {
+                        if (debug) console.log("PART 1.1");
                         part1_1();
                     }
                 });
 
                 function part1_1() {
                     let i = 0;
-                    if(debug) console.log("Creating roles...")
+                    if (debug) console.log("Creating roles...")
                     const broles = backup.roles.sort(function (a: { rawPosition: number; }, b: { rawPosition: number; }) {
                         return b.rawPosition - a.rawPosition;
                     });
@@ -262,7 +274,7 @@ export function loadBackup(backup_id: String, guild: Guild, path = "/backup/", d
                         //console.log(`Attempt to ${role.name}`)
                         if (!role.managed && role.name !== "@everyone") {
                             setTimeout(function () {
-                                if(debug) console.log("Creating role...")
+                                if (debug) console.log("Creating role...")
                                 guild.roles.create({
                                     data: {
                                         name: role.name,
@@ -273,7 +285,7 @@ export function loadBackup(backup_id: String, guild: Guild, path = "/backup/", d
                                         permissions: role.permissions
                                     }
                                 }).then((new_role) => {
-                                    if(debug) console.log(`Created ${role.name} | ${i}/${broles.length}`)
+                                    if (debug) console.log(`Created ${role.name} | ${i}/${broles.length}`)
                                     roles.set(role.id, {
                                         old_id: role.id,
                                         new_id: new_role.id
@@ -281,26 +293,26 @@ export function loadBackup(backup_id: String, guild: Guild, path = "/backup/", d
                                     i++
                                     for (const member of role.members) {
 
-                                        if(!guild.members.cache.get(member.id)) {
+                                        if (!guild.members.cache.get(member.id)) {
                                             continue;
                                         } else {
                                             setTimeout(function () {
                                                 // @ts-ignore
-                                                if(debug) console.log("Adding role")
+                                                if (debug) console.log("Adding role")
                                                 guild.members.cache.get(member.id)?.roles?.add(new_role.id)
                                             }, 200)
                                         }
                                     }
 
-                                    if(i === broles.length) {
-                                        if(debug) console.log("PART 2")
+                                    if (i === broles.length) {
+                                        if (debug) console.log("PART 2")
                                         part2();
                                     }
                                 })
 
                             }, 400)
                         } else if (role.name === '@everyone') {
-                            if(debug) console.log(`Passing everyone | ${i}/${broles.length}`)
+                            if (debug) console.log(`Passing everyone | ${i}/${broles.length}`)
                             guild.roles.everyone.edit({
                                 permissions: role.permissions
                             }).then((new_role) => {
@@ -310,50 +322,51 @@ export function loadBackup(backup_id: String, guild: Guild, path = "/backup/", d
                                     new_id: new_role.id
                                 });
                                 i++;
-                                if(i === broles.length) {
-                                    if(debug) console.log("PART 2")
+                                if (i === broles.length) {
+                                    if (debug) console.log("PART 2")
                                     part2();
                                 }
                             })
-                        } else if(role.managed) {
-                            if(debug) console.log(`Passing ${role.name} | ${i}/${broles.length}`)
+                        } else if (role.managed) {
+                            if (debug) console.log(`Passing ${role.name} | ${i}/${broles.length}`)
                             i++
-                            if(i === broles.length) {
-                                if(debug) console.log("PART 2")
+                            if (i === broles.length) {
+                                if (debug) console.log("PART 2")
                                 part2();
                             }
                         }
-                        if(i === broles.length) {
-                            if(debug) console.log("PART 2")
+                        if (i === broles.length) {
+                            if (debug) console.log("PART 2")
                             part2();
                         }
                     }
                 }
 
                 function part2() {
-                    if(debug) console.log("Deleting Channels...")
+                    if (debug) console.log("Deleting Channels...")
                     const max_chan = guild.channels.cache.size;
                     let io = 0;
                     guild.channels.cache.each(channel => {
                         if (channel.deletable) {
                             setTimeout(function () {
                                 io++
-                                if(debug) console.log(`Deleted ${channel.name} | ${io}/${max_chan}`)
+                                if (debug) console.log(`Deleted ${channel.name} | ${io}/${max_chan}`)
                                 channel.delete();
                                 //io++
-                                if(io === max_chan-1) {
-                                    if(debug) console.log("PART 2.1")
+                                if (io === max_chan - 1) {
+                                    if (debug) console.log("PART 2.1")
                                     part2_1();
                                 }
                             }, 300)
                         }
-                        if(io === max_chan-1) {
-                            if(debug) console.log("PART 2.1")
+                        if (io === max_chan - 1) {
+                            if (debug) console.log("PART 2.1")
                             part2_1();
                         }
                     });
 
                 }
+
                 function part2_1() {
                     let i = 0;
                     // @ts-ignore
@@ -390,8 +403,8 @@ export function loadBackup(backup_id: String, guild: Guild, path = "/backup/", d
                                         new_id: new_channel.id
                                     })
                                     i++
-                                    if(i === bchannels.length) {
-                                        if(debug) console.log("PART 2.2")
+                                    if (i === bchannels.length) {
+                                        if (debug) console.log("PART 2.2")
                                         part2_2();
                                     }
                                 })
@@ -399,12 +412,13 @@ export function loadBackup(backup_id: String, guild: Guild, path = "/backup/", d
                         } else {
                             i++
                         }
-                        if(i === bchannels.length) {
-                            if(debug) console.log("PART 2.2")
+                        if (i === bchannels.length) {
+                            if (debug) console.log("PART 2.2")
                             part2_2();
                         }
                     })
                 }
+
                 function part2_2() {
                     let i = 0;
                     const bchannels = backup.channels.sort(function (a: { rawPosition: number; }, b: { rawPosition: number; }) {
@@ -435,7 +449,7 @@ export function loadBackup(backup_id: String, guild: Guild, path = "/backup/", d
                                     // @ts-ignore
                                     parent = channels.get(channel.parentID).new_id;
                                 }
-                                if(channel.type.toLowerCase() === "news") {
+                                if (channel.type.toLowerCase() === "news") {
                                     channel.type = "text"
                                 }
                                 //console.log(channel.type)
@@ -452,8 +466,8 @@ export function loadBackup(backup_id: String, guild: Guild, path = "/backup/", d
                                     parent: parent
                                 })
                                 i++
-                                if(i === bchannels.length) {
-                                    if(debug) console.log("PART 3")
+                                if (i === bchannels.length) {
+                                    if (debug) console.log("PART 3")
                                     part3();
                                 }
                             }, 400)
@@ -461,8 +475,8 @@ export function loadBackup(backup_id: String, guild: Guild, path = "/backup/", d
                             i++
 
                         }
-                        if(i === bchannels.length) {
-                            if(debug) console.log("PART 3")
+                        if (i === bchannels.length) {
+                            if (debug) console.log("PART 3")
                             part3();
                         }
                     })
@@ -476,15 +490,15 @@ export function loadBackup(backup_id: String, guild: Guild, path = "/backup/", d
                             setTimeout(function () {
                                 emoji.delete();
                                 ie++;
-                                if(ie === max_emot-1) {
-                                    if(debug) console.log("PART 3.1");
+                                if (ie === max_emot - 1) {
+                                    if (debug) console.log("PART 3.1");
                                     part3_1();
                                 }
                             }, 100)
                         }
                     });
-                    if(ie === max_emot) {
-                        if(debug) console.log("PART 3.1");
+                    if (ie === max_emot) {
+                        if (debug) console.log("PART 3.1");
                         part3_1();
                     }
 
@@ -560,22 +574,22 @@ export function loadBackup(backup_id: String, guild: Guild, path = "/backup/", d
     })
 }
 
-export function getBackupRAW(backup_id: String, path = "/backup/") {
+export function getBackupRAW(backup_id: String, path: string = "/backup/") {
     return new Promise((resolve, reject) => {
         // @ts-ignore
-        if(!existsSync(`${dirname(require.main.filename)}${path}${backup_id}.json`)) {
+        if (!existsSync(`${dirname(require.main.filename)}${path}${backup_id}.axbs1`)) {
             resolve({
                 exists: false
             })
         } else {
             // @ts-ignore
-            readFile(`${dirname(require.main.filename)}${path}${backup_id}.json`, 'utf8', function (err, data) {
+            readFile(`${dirname(require.main.filename)}${path}${backup_id}.axbs1`, 'utf8', function (err, data) {
                 if (err) return reject(err);
                 const data_json = JSON.parse(data);
                 resolve({
                     backup_id: backup_id,
                     // @ts-ignore
-                    path: `${dirname(require.main.filename)}${path}${backup_id}.json`,
+                    path: `${dirname(require.main.filename)}${path}${backup_id}.axbs1`,
                     backup: data_json,
                     exists: true
                 })
@@ -584,7 +598,7 @@ export function getBackupRAW(backup_id: String, path = "/backup/") {
     })
 }
 
-export function getAllBackups(path = '/backup/') {
+export function getAllBackups(path: string = '/backup/') {
     return new Promise(resolve => {
         // @ts-ignore
         const files = readdirSync(`${dirname(require.main.filename)}${path}`);
@@ -600,53 +614,43 @@ export function getAllBackups(path = '/backup/') {
         files.forEach((e) => {
             try {
                 const fileName = e.split('.')[0];
-                if(e.endsWith('json')) {
-                    count3++
-                }
-                if(e.endsWith('json')) {
+                if (e.endsWith('axbs1')) {
                     // @ts-ignore
-                    const size = statSync(`${dirname(require.main.filename)}${path}${fileName}.json`).size / (1024 * 1024);
-                console.log("H")
+                    const size = statSync(`${dirname(require.main.filename)}${path}${fileName}.axbs1`).size / (1024 * 1024);
                     // @ts-ignore
-                   readFile(`${dirname(require.main.filename)}${path}${fileName}.json`, 'utf8', function(err, data) {
+                    readFile(`${dirname(require.main.filename)}${path}${fileName}.axbs1`, 'utf8', function (err, data) {
                         if (err) return console.error(err);
-                        console.log("HE")
                         const data_json = JSON.parse(data);
                         backups.push({
                             backup_id: fileName,
                             // @ts-ignore
-                            path: `${dirname(require.main.filename)}${path}${fileName}.json`,
+                            path: `${dirname(require.main.filename)}${path}${fileName}.axbs1`,
                             guild_base_id: data_json.backuper.id,
                             createdAt: data_json.backuper.createdAt,
                             owner_id: data_json.backuper.owner_id,
                             author_id: data_json.backuper.creatorId,
                             size: size
                         })
-                       console.log("HEY")
                         count++
-                         count2++
-                       if(count2 === files.length && count3 === count3) {
-                           const finish = Date.now()
-                           resolve({
-                               backups: backups,
-                               time_elapsed: finish - start,
-                               fetched_backups: count,
-                               fetched_files: count2,
-                               fetched_json_files: count3
-                           })
-                       }
+                        count2++
+                        if (count2 === files.length) {
+                            const finish = Date.now()
+                            resolve({
+                                backups: backups,
+                                time_elapsed: finish - start,
+                                fetched_backups: count,
+                            })
+                        }
                     })
                 } else {
                     count2++
                 }
-                if(count2 === files.length && count3 === count3) {
+                if (count2 === files.length) {
                     const finish = Date.now()
                     resolve({
                         backups: backups,
                         time_elapsed: finish - start,
                         fetched_backups: count,
-                        fetched_files: count2,
-                        fetched_json_files: count3
                     })
                 }
             } catch (error) {
@@ -655,4 +659,227 @@ export function getAllBackups(path = '/backup/') {
         });
 
     })
+}
+
+export function isBackupFile(backup_id: string, path: string = '/backup/', makeItCompatible: boolean = false) {
+    return new Promise((resolve, reject) => {
+        let extension = "absx1";
+        // @ts-ignore
+        if (!existsSync(`${dirname(require.main.filename)}${path}${backup_id}.axbs1`)) {
+            // @ts-ignore
+            if (!existsSync(`${dirname(require.main.filename)}${path}${backup_id}.json`)) {
+                resolve({
+                    exists: false
+                })
+            } else {
+                extension = "json";
+            }
+        }
+        // @ts-ignore
+        readFile(`${dirname(require.main.filename)}${path}${backup_id}.${extension}`, 'utf8', async (err, data) => {
+            if (err) return reject(err);
+            const data_json = JSON.parse(data);
+            const isB = await INTERNAL_isBackupFile(data_json);
+            if(isB.isActualBackup) {
+                if(extension === "json") {
+                    if(makeItCompatible) {
+                        await makeBackupFileCompatible(backup_id, path).then(r => {
+                            if(r.reformated) {
+                                resolve({
+                                    isBackupFile: false,
+                                    isCompatible: true,
+                                    isReformated: true,
+                                    exists: true
+                                })
+                            }
+                        })
+                    } else {
+                        resolve({
+                            isBackupFile: false,
+                            isCompatible: true,
+                            isReformated: false,
+                            exists: true
+                        })
+                    }
+                } else {
+                    resolve({
+                        isBackupFile: true,
+                        isCompatible: true,
+                        isReformated: false,
+                        exists: true
+                    })
+                }
+            } else if(isB.isReformatable) {
+                if(makeItCompatible) {
+                    await makeBackupFileCompatible(backup_id, path).then(r => {
+                        if(r.reformated) {
+                            resolve({
+                                isBackupFile: false,
+                                isCompatible: true,
+                                isReformated: true,
+                                exists: true
+                            })
+                        }
+                    })
+                } else {
+                    resolve({
+                        isBackupFile: false,
+                        isCompatible: true,
+                        isReformated: false,
+                        exists: true
+                    })
+                }
+            }
+        })
+    })
+}
+
+export function makeBackupFileCompatible(backup_id: string, path: string = '/backup/', deleteOld: boolean = true): Promise<{reformated: boolean, deletedOld: boolean, exists: boolean}> {
+    return new Promise((resolve, reject) => {
+        let extension = "absx1";
+        // @ts-ignore
+        if (!existsSync(`${dirname(require.main.filename)}${path}${backup_id}.axbs1`)) {
+            // @ts-ignore
+            if (!existsSync(`${dirname(require.main.filename)}${path}${backup_id}.json`)) {
+                resolve({
+                    reformated: false,
+                    deletedOld: false,
+                    exists: false
+                })
+            } else {
+                extension = "json";
+            }
+        }
+        // @ts-ignore
+        readFile(`${dirname(require.main.filename)}${path}${backup_id}.${extension}`, 'utf8', async (err, data) => {
+            if (err) return reject(err);
+            const data_json = JSON.parse(data);
+            const isB = await INTERNAL_isBackupFile(data_json);
+            if(isB.isReformatable) {
+                Object.assign({version: 1}, data_json);
+                // @ts-ignore
+                writeFile(`${dirname(require.main.filename)}${path}${backup_id}.axbs1`, new Buffer.from(JSON.stringify(data_json)), 'utf8', function () {
+                });
+                if(deleteOld) {
+                    // @ts-ignore
+                    unlink(`${dirname(require.main.filename)}${path}${backup_id}.json`, (err) => {
+                        if (err) return reject(err);
+                    });
+                    resolve({
+                        reformated: true,
+                        deletedOld: true,
+                        exists: true
+                    })
+                }
+                resolve({
+                    reformated: true,
+                    deletedOld: false,
+                    exists: true
+                })
+            } else {
+                resolve({
+                    reformated: false,
+                    deletedOld: false,
+                    exists: true
+                })
+            }
+        })
+    })
+}
+
+/**
+ * @param {Object} backup_content
+ * @return Promise<Object>
+ */
+function INTERNAL_isBackupFile(backup_content: Object): Promise<{isActualBackup: boolean, isReformatable: boolean | undefined}> {
+    return new Promise((resolve) => {
+        const proof_object = {
+            version: null,
+            backuper: {
+                id: null,
+                owner_id: null,
+                createdAt: null,
+                creatorId: null
+            },
+            name: null,
+            icon: null,
+            splash: null,
+            discoverySplash: null,
+            region: null,
+            afkTimeout: null,
+            afkChannelID: null,
+            systemChannelFlags: null,
+            systemChannelID: null,
+            verificationLevel: null,
+            explicitContentFilter: null,
+            mfaLevel: null,
+            defaultMessageNotifications: null,
+            vanityURLCode: null,
+            description: null,
+            banner: null,
+            rulesChannelID: null,
+            publicUpdatesChannelID: null,
+            preferredLocale: null,
+            roles: null,
+            channels: null,
+            emoji: null,
+            bans: null
+        };
+        const proof_object_without_version = {
+            backuper: {
+                id: null,
+                owner_id: null,
+                createdAt: null,
+                creatorId: null
+            },
+            name: null,
+            icon: null,
+            splash: null,
+            discoverySplash: null,
+            region: null,
+            afkTimeout: null,
+            afkChannelID: null,
+            systemChannelFlags: null,
+            systemChannelID: null,
+            verificationLevel: null,
+            explicitContentFilter: null,
+            mfaLevel: null,
+            defaultMessageNotifications: null,
+            vanityURLCode: null,
+            description: null,
+            banner: null,
+            rulesChannelID: null,
+            publicUpdatesChannelID: null,
+            preferredLocale: null,
+            roles: null,
+            channels: null,
+            emoji: null,
+            bans: null
+        };
+
+        if (!INTERNAL_hasSameProps(backup_content, proof_object_without_version)) {
+            if (!INTERNAL_hasSameProps(backup_content, proof_object)) {
+                resolve({
+                    isActualBackup: false,
+                    isReformatable: false
+                })
+            } else {
+                resolve({
+                    isActualBackup: true,
+                    isReformatable: undefined
+                })
+            }
+        } else {
+            resolve({
+                isActualBackup: false,
+                isReformatable: true
+            })
+        }
+    })
+}
+
+function INTERNAL_hasSameProps(obj1: Object, obj2: Object) {
+    return Object.keys(obj1).every(function (prop) {
+        return obj2.hasOwnProperty(prop);
+    });
 }

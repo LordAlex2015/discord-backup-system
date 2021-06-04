@@ -6,6 +6,14 @@
 ## Installation
 `npm install discord-backup-system`
 
+## Dev Note:
+
+**I changed the file type to `axbs1`. To make the transition easier for you, I made some functions: `isBackupFile` and `makeBackupFileCompatible`.**
+
++
+
+Added custom backup names!
+
 ## Usage
 
 ### Create a Backup
@@ -14,7 +22,7 @@ const backup = require('discord-backup-system');
 
 // ... 
 // Your Message Event / Command
-backup.createBackup(message.guild, message.author.id, '/backup/').then(backupData => {
+backup.createBackup(message.guild, message.author.id, '/backup/', `${message.guild.id}-#{GEN_SHORT}#`).then(backupData => {
     message.channel.send(`This is your backup: \`${backupData.id}\``)
 });
 ```
@@ -25,6 +33,7 @@ backup.createBackup(message.guild, message.author.id, '/backup/').then(backupDat
 | guild | Guild | Guild To Backup | None |
 | authorId | Snowflake | Author of the backup | None |
 | path | String | Path to save the backup | /backup/ |
+| name | String | Backup Name (#{GEN}# to generated a random string and #{GEN_SHORT}# to generate a shorter strings) | Generated |
 
 #### Result
 
@@ -49,7 +58,7 @@ backup.backupInfo(backup_id, '/backup/').then(backupData => {
 | Usage Params | Type | Explication | Default |
 | ----- |------| ------- | ----- |
 | backup_id | String |  Backup Id to give info | None |
-| path | String | Path to save the backup | /backup/ |
+| path | String | Path | /backup/ |
 
 #### Result
 
@@ -77,7 +86,7 @@ backup.getBackupRAW(backup_id, message.guild, '/backup/');
 | Usage Params | Type | Explication | Default |
 | ----- |------| ------- | ----- |
 | backup_id | String |  Backup Id to give info | None |
-| path | String | Path to save the backup | /backup/ |
+| path | String | Path | /backup/ |
 
 #### Result
 
@@ -101,7 +110,7 @@ backup.getAllBackups(backup_id, message.guild, '/backup/');
 
 | Usage Params | Type | Explication | Default |
 | ----- |------| ------- | ----- |
-| path | String | Path to save the backup | /backup/ |
+| path | String | Path | /backup/ |
 
 #### Result
 
@@ -125,8 +134,8 @@ backup.deleteBackup(backup_id, "/backup/");
 
 | Usage Params | Type | Explication | Default |
 | ----- |------| ------- | ----- |
-| backup_id | String |  Backup Id to give info | None |
-| path | String | Path to save the backup | /backup/ |
+| backup_id | String |  Backup Id | None |
+| path | String | Path | /backup/ |
 
 #### Result
 
@@ -149,9 +158,9 @@ backup.loadBackup(backup_id, message.guild, '/backup/');
 
 | Usage Params | Type | Explication | Default |
 | ----- |------| ------- | ----- |
-| backup_id | String |  Backup Id to give info | None |
+| backup_id | String |  Backup Id | None |
 | guild | Guild | Guild to load backup | None |
-| path | String | Path to save the backup | /backup/ 
+| path | String | Path  | /backup/ 
 | debug | Bool | Debug Mode | false |
 
 #### Result
@@ -162,5 +171,56 @@ backup.loadBackup(backup_id, message.guild, '/backup/');
 | reversed_roles | Collection | Roles Equivalent |
 | reversed_channels | Collection | Channels Equivalent |
 | bans | Array | All Bans |
+| exists | Bool | Return if file exists (If Not only exists will be in results) |
+
+### Is A Backup File?
+```js
+const backup = require('discord-backup-system');
+
+// ... 
+// Your Message Event / Command
+backup.isBackupFile(backup_id, '/backup/', true);
+```
+
+#### Usage
+
+| Usage Params | Type | Explication | Default |
+| ----- |------| ------- | ----- |
+| backup_id | String |  Backup Id | None |
+| path | String | Path | /backup/ |
+| makeItCompatible | Bool | If the backup is compatible, it will create a valid backup file (.axbs1) | false |
+
+#### Result
+
+| Result Params | Type | Explication | 
+| ----- |------| ------- |
+| isBackupFile | Bool | If the file is a valid backup file (.axbs1) |
+| isCompatible | Bool | If the file is compatible to reformating |
+| isReformated | Bool | If the file was reformated |
+| exists | Bool | Return if file exists (If Not only exists will be in results) |
+
+### Make Backup File Compatible
+```js
+const backup = require('discord-backup-system');
+
+// ... 
+// Your Message Event / Command
+backup.makeBackupFileCompatible(backup_id, '/backup/', true);
+```
+
+#### Usage
+
+| Usage Params | Type | Explication | Default |
+| ----- |------| ------- | ----- |
+| backup_id | String |  Backup Id | None |
+| path | String | Path | /backup/ |
+| deleteOld | Bool | If the backup is compatible, it will create a valid backup file (.axbs1) | true |
+
+#### Result
+
+| Result Params | Type | Explication | 
+| ----- |------| ------- |
+| reformated | Bool | Is the file was reformated |
+| deletedOld | Bool | If the old backup file was deleted |
 | exists | Bool | Return if file exists (If Not only exists will be in results) |
 
