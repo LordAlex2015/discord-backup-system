@@ -8,11 +8,8 @@
 
 ## Dev Note:
 
-**I changed the file type to `axbs1`. To make the transition easier for you, I made some functions: `isBackupFile` and `makeBackupFileCompatible`.**
-
-+
-
-Added custom backup names!
++ **I changed the file type to `axbs1`. To make the transition easier for you, I made some functions: `isBackupFile` and `makeBackupFileCompatible`.**
++ Added custom backup names!
 
 ## Usage
 
