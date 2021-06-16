@@ -650,60 +650,65 @@ function getAllBackups(path) {
     return new Promise(function (resolve) {
         // @ts-ignore
         var files = fs_1.readdirSync("" + path_1.dirname(require.main.filename) + path);
-        var backups = [];
-        var start = Date.now();
-        var count = 0;
-        var count2 = 0;
-        var count3 = 0;
-        files.forEach(function (e) {
-            try {
-                var fileName_1 = e.split('.')[0];
-                if (e.endsWith('axbs1')) {
-                    // @ts-ignore
-                    var size_2 = fs_1.statSync("" + path_1.dirname(require.main.filename) + path + fileName_1 + ".axbs1").size / (1024 * 1024);
-                    // @ts-ignore
-                    fs_1.readFile("" + path_1.dirname(require.main.filename) + path + fileName_1 + ".axbs1", 'utf8', function (err, data) {
-                        if (err)
-                            return console.error(err);
-                        var data_json = JSON.parse(data);
-                        backups.push({
-                            backup_id: fileName_1,
-                            // @ts-ignore
-                            path: "" + path_1.dirname(require.main.filename) + path + fileName_1 + ".axbs1",
-                            guild_base_id: data_json.backuper.id,
-                            createdAt: data_json.backuper.createdAt,
-                            owner_id: data_json.backuper.owner_id,
-                            author_id: data_json.backuper.creatorId,
-                            size: size_2
-                        });
-                        count++;
-                        count2++;
-                        if (count2 === files.length) {
-                            var finish = Date.now();
-                            resolve({
-                                backups: backups,
-                                time_elapsed: finish - start,
-                                fetched_backups: count
+        if (files.length < 1) {
+            resolve({ backups: [], time_elapsed: 0, fetched_backups: 0 });
+        }
+        else {
+            var backups_1 = [];
+            var start_1 = Date.now();
+            var count_1 = 0;
+            var count2_1 = 0;
+            var count3 = 0;
+            files.forEach(function (e) {
+                try {
+                    var fileName_1 = e.split('.')[0];
+                    if (e.endsWith('axbs1')) {
+                        // @ts-ignore
+                        var size_2 = fs_1.statSync("" + path_1.dirname(require.main.filename) + path + fileName_1 + ".axbs1").size / (1024 * 1024);
+                        // @ts-ignore
+                        fs_1.readFile("" + path_1.dirname(require.main.filename) + path + fileName_1 + ".axbs1", 'utf8', function (err, data) {
+                            if (err)
+                                return console.error(err);
+                            var data_json = JSON.parse(data);
+                            backups_1.push({
+                                backup_id: fileName_1,
+                                // @ts-ignore
+                                path: "" + path_1.dirname(require.main.filename) + path + fileName_1 + ".axbs1",
+                                guild_base_id: data_json.backuper.id,
+                                createdAt: data_json.backuper.createdAt,
+                                owner_id: data_json.backuper.owner_id,
+                                author_id: data_json.backuper.creatorId,
+                                size: size_2
                             });
-                        }
-                    });
+                            count_1++;
+                            count2_1++;
+                            if (count2_1 === files.length) {
+                                var finish = Date.now();
+                                resolve({
+                                    backups: backups_1,
+                                    time_elapsed: finish - start_1,
+                                    fetched_backups: count_1
+                                });
+                            }
+                        });
+                    }
+                    else {
+                        count2_1++;
+                    }
+                    if (count2_1 === files.length) {
+                        var finish = Date.now();
+                        resolve({
+                            backups: backups_1,
+                            time_elapsed: finish - start_1,
+                            fetched_backups: count_1
+                        });
+                    }
                 }
-                else {
-                    count2++;
+                catch (error) {
+                    throw new Error("Failed to fetch file " + e + ": " + (error.stack || error));
                 }
-                if (count2 === files.length) {
-                    var finish = Date.now();
-                    resolve({
-                        backups: backups,
-                        time_elapsed: finish - start,
-                        fetched_backups: count
-                    });
-                }
-            }
-            catch (error) {
-                throw new Error("Failed to fetch file " + e + ": " + (error.stack || error));
-            }
-        });
+            });
+        }
     });
 }
 exports.getAllBackups = getAllBackups;
