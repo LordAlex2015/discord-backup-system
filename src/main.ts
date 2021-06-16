@@ -602,6 +602,9 @@ export function getAllBackups(path: string = '/backup/') {
     return new Promise(resolve => {
         // @ts-ignore
         const files = readdirSync(`${dirname(require.main.filename)}${path}`);
+        if (files.length < 1) {
+            resolve({backups: [], time_elapsed: 0, fetched_backups: 0})
+        } else {
         let backups: {
             backup_id: string;
             // @ts-ignore
@@ -611,53 +614,53 @@ export function getAllBackups(path: string = '/backup/') {
         let count = 0
         let count2 = 0
         let count3 = 0
-        files.forEach((e) => {
-            try {
-                const fileName = e.split('.')[0];
-                if (e.endsWith('axbs1')) {
-                    // @ts-ignore
-                    const size = statSync(`${dirname(require.main.filename)}${path}${fileName}.axbs1`).size / (1024 * 1024);
-                    // @ts-ignore
-                    readFile(`${dirname(require.main.filename)}${path}${fileName}.axbs1`, 'utf8', function (err, data) {
-                        if (err) return console.error(err);
-                        const data_json = JSON.parse(data);
-                        backups.push({
-                            backup_id: fileName,
-                            // @ts-ignore
-                            path: `${dirname(require.main.filename)}${path}${fileName}.axbs1`,
-                            guild_base_id: data_json.backuper.id,
-                            createdAt: data_json.backuper.createdAt,
-                            owner_id: data_json.backuper.owner_id,
-                            author_id: data_json.backuper.creatorId,
-                            size: size
-                        })
-                        count++
-                        count2++
-                        if (count2 === files.length) {
-                            const finish = Date.now()
-                            resolve({
-                                backups: backups,
-                                time_elapsed: finish - start,
-                                fetched_backups: count,
+            files.forEach((e) => {
+                try {
+                    const fileName = e.split('.')[0];
+                    if (e.endsWith('axbs1')) {
+                        // @ts-ignore
+                        const size = statSync(`${dirname(require.main.filename)}${path}${fileName}.axbs1`).size / (1024 * 1024);
+                        // @ts-ignore
+                        readFile(`${dirname(require.main.filename)}${path}${fileName}.axbs1`, 'utf8', function (err, data) {
+                            if (err) return console.error(err);
+                            const data_json = JSON.parse(data);
+                            backups.push({
+                                backup_id: fileName,
+                                // @ts-ignore
+                                path: `${dirname(require.main.filename)}${path}${fileName}.axbs1`,
+                                guild_base_id: data_json.backuper.id,
+                                createdAt: data_json.backuper.createdAt,
+                                owner_id: data_json.backuper.owner_id,
+                                author_id: data_json.backuper.creatorId,
+                                size: size
                             })
-                        }
-                    })
-                } else {
-                    count2++
+                            count++
+                            count2++
+                            if (count2 === files.length) {
+                                const finish = Date.now()
+                                resolve({
+                                    backups: backups,
+                                    time_elapsed: finish - start,
+                                    fetched_backups: count,
+                                })
+                            }
+                        })
+                    } else {
+                        count2++
+                    }
+                    if (count2 === files.length) {
+                        const finish = Date.now()
+                        resolve({
+                            backups: backups,
+                            time_elapsed: finish - start,
+                            fetched_backups: count,
+                        })
+                    }
+                } catch (error) {
+                    throw new Error(`Failed to fetch file ${e}: ${error.stack || error}`)
                 }
-                if (count2 === files.length) {
-                    const finish = Date.now()
-                    resolve({
-                        backups: backups,
-                        time_elapsed: finish - start,
-                        fetched_backups: count,
-                    })
-                }
-            } catch (error) {
-                throw new Error(`Failed to fetch file ${e}: ${error.stack || error}`)
-            }
-        });
-
+            });
+        }
     })
 }
 
