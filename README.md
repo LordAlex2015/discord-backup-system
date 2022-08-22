@@ -6,20 +6,23 @@
 ## Installation
 `npm install discord-backup-system`
 
-## Dev Note:
+## Patch Note:
 
-+ **I changed the file type to `axbs1`. To make the transition easier for you, I made some functions: `isBackupFile` and `makeBackupFileCompatible`.**
-+ Added custom backup names!
++ Backup files are now axbs2 format. The system will automatically convert axbs1 to axbs2 format if you were using an older version of the system.
++ The backup system is now a class. It will be needed to be initialized first.
++ You can now choose the order of the loading of the backup. *I recommend you to use the default order.*
++ The Backup ID is still editable.
 
 ## Usage
 
 ### Create a Backup
 ```js
-const backup = require('discord-backup-system');
+const BackupSystem = require('discord-backup-system');
 
+client.BackupSystem = new BackupSystem("/backups/");
 // ... 
 // Your Message Event / Command
-backup.createBackup(message.guild, message.author.id, '/backup/', `${message.guild.id}-#{GEN_SHORT}#`).then(backupData => {
+client.BackupSystem.create(message.guild, message.author.id, `${message.guild.id}-#{GEN_SHORT}#`).then(backupData => {
     message.channel.send(`This is your backup: \`${backupData.id}\``)
 });
 ```
@@ -29,23 +32,24 @@ backup.createBackup(message.guild, message.author.id, '/backup/', `${message.gui
 | ----- |------| ------- | ----- |
 | guild | Guild | Guild To Backup | None |
 | authorId | Snowflake | Author of the backup | None |
-| path | String | Path to save the backup | /backup/ |
 | name | String | Backup Name (#{GEN}# to generated a random string and #{GEN_SHORT}# to generate a shorter strings) | Generated |
 
 #### Result
 
-| Params | Type | Explication | 
-| ----- |------| ------- | 
-| id | String | Backup Id | 
-| path | String | Backup Path (Path/backup_id.json) |
+| Params | Type | Explication                        | 
+| ----- |------|------------------------------------| 
+| id | String | Backup Id                          | 
+| path | String | Backup Path (Path/backup_id.axbs2) |
+| backup | Backup | Backup Data                        |
 
 ### Backup Info
 ```js
-const backup = require('discord-backup-system');
+const BackupSystem = require('discord-backup-system');
 
+client.BackupSystem = new BackupSystem("/backups/");
 // ... 
 // Your Message Event / Command
-backup.backupInfo(backup_id, '/backup/').then(backupData => {
+client.BackupSystem.getBackupInfo(backup_id).then(backupData => {
     message.channel.send(`Backup Size: ${Math.floor(backupData.size)} MB`)
 });
 ```
@@ -55,76 +59,49 @@ backup.backupInfo(backup_id, '/backup/').then(backupData => {
 | Usage Params | Type | Explication | Default |
 | ----- |------| ------- | ----- |
 | backup_id | String |  Backup Id to give info | None |
-| path | String | Path | /backup/ |
 
 #### Result
 
-| Result Params | Type | Explication | 
-| ----- |------| ------- | 
-| size | Number | Size in MB | 
-| backup_id | String | Backup Id |
-| createdAt | Number | Creation timestamp |
-| guild_base_id | Snowflake | Backup guild id |
-| owner_id | Snowflake | Backup Guild owner id |
-| author_id | Snowflake | Backup creator id |
-| exists | Bool | Return if file exists (If Not only exists will be in results) |
+| Result Params | Type | Explication                                                               | 
+|---------------|------|---------------------------------------------------------------------------| 
+| size          | Number | Size in MB                                                                | 
+| backup_id     | String | Backup Id                                                                 |
+| createdAt     | Number | Creation timestamp                                                        |
+| authorId      | String | The Creator of the backup ID                                              |
+| Guild         | { id: string; owner_id: string } | The guild data                                                            |
+| exists        | Bool | Return if file exists ( If Not, only exists param will be returned )      |
 
-### Raw Backup Info
+
+### ~~Get All Backups~~
 ```js
-const backup = require('discord-backup-system');
+/* NOT IMPLEMENTED YET */
+const BackupSystem = require('discord-backup-system');
 
+client.BackupSystem = new BackupSystem("/backups/");
 // ... 
 // Your Message Event / Command
-backup.getBackupRAW(backup_id, message.guild, '/backup/');
+client.BackupSystem.getAllBackups(backup_id, message.guild, '/backup/');
 ```
 
-#### Usage
+#### ~~Usage~~
 
 | Usage Params | Type | Explication | Default |
 | ----- |------| ------- | ----- |
-| backup_id | String |  Backup Id to give info | None |
-| path | String | Path | /backup/ |
 
-#### Result
+#### ~~Result~~
 
 | Result Params | Type | Explication | 
 | ----- |------| ------- |
-| backup_id | String | Backup Id |
-| path | String | Backup file path |
-| backup | Object | Backup file content |
-| exists | Bool | Return if file exists (If Not only exists will be in results) |
-
-### Get All Backups
-```js
-const backup = require('discord-backup-system');
-
-// ... 
-// Your Message Event / Command
-backup.getAllBackups(backup_id, message.guild, '/backup/');
-```
-
-#### Usage
-
-| Usage Params | Type | Explication | Default |
-| ----- |------| ------- | ----- |
-| path | String | Path | /backup/ |
-
-#### Result
-
-| Result Params | Type | Explication | 
-| ----- |------| ------- |
-| backups | Array | Array of backups infos (Same as backupInfo) |
-| time_elapsed | Number | Backup file path |
-| fetched | Number | Total of backup files fetched |
 
 
 ### Backup Delete
 ```js
-const backup = require('discord-backup-system');
+const BackupSystem = require('discord-backup-system');
 
+client.BackupSystem = new BackupSystem("/backups/");
 // ... 
 // Your Message Event / Command
-backup.deleteBackup(backup_id, "/backup/");
+client.BackupSystem.deleteBackup(backup_id);
 ```
 
 #### Usage
@@ -132,51 +109,48 @@ backup.deleteBackup(backup_id, "/backup/");
 | Usage Params | Type | Explication | Default |
 | ----- |------| ------- | ----- |
 | backup_id | String |  Backup Id | None |
-| path | String | Path | /backup/ |
 
 #### Result
 
-| Result Params | Type | Explication | 
-| ----- |------| ------- | 
-| deleted | Bool | Deleted or not | 
-| backup_id | String | Backup Id |
-| exists | Bool | Return if file exists (If Not only exists will be in results) |
+| Result Params | Type | Explication                                                           | 
+| ----- |------|-----------------------------------------------------------------------| 
+| backup_id | String | Backup Id                                                             |
+| deleted | Bool | Deleted or not                                                        |
+| exists | Bool | Return if file exists (If Not, only exists param will be in returned) |
 
 ### Load Backup
 ```js
-const backup = require('discord-backup-system');
+const BackupSystem = require('discord-backup-system');
 
+client.BackupSystem = new BackupSystem("/backups/");
 // ... 
 // Your Message Event / Command
-backup.loadBackup(backup_id, message.guild, '/backup/');
+client.BackupSystem.load(backup_id, message.guild);
 ```
 
 #### Usage
 
-| Usage Params | Type | Explication | Default |
-| ----- |------| ------- | ----- |
-| backup_id | String |  Backup Id | None |
-| guild | Guild | Guild to load backup | None |
-| path | String | Path  | /backup/ 
-| debug | Bool | Debug Mode | false |
+| Usage Params | Type   | Explication          | Default |
+|--------------|--------|----------------------| ----- |
+| backup_id    | String | Backup Id            | None |
+| guild        | Guild  | Guild to load backup | None |
+| order        | String | Order of loading     | channels_roles&create_emojis&delete_emojis&bans&guild |
 
 #### Result
 
-| Result Params | Type | Explication | 
-| ----- |------| ------- |
-| backup_id | String | Backup Id |
-| reversed_roles | Collection | Roles Equivalent |
-| reversed_channels | Collection | Channels Equivalent |
-| bans | Array | All Bans |
-| exists | Bool | Return if file exists (If Not only exists will be in results) |
+| Result Params | Type   | Explication | 
+|---------------|--------|-------------|
+| Backup        | Backup | Backup Data |
+
 
 ### Is A Backup File?
 ```js
-const backup = require('discord-backup-system');
+const BackupSystem = require('discord-backup-system');
 
+client.BackupSystem = new BackupSystem("/backups/");
 // ... 
 // Your Message Event / Command
-backup.isBackupFile(backup_id, '/backup/', true);
+client.BackupSystem.isBackupFile(backup_id);
 ```
 
 #### Usage
@@ -184,25 +158,24 @@ backup.isBackupFile(backup_id, '/backup/', true);
 | Usage Params | Type | Explication | Default |
 | ----- |------| ------- | ----- |
 | backup_id | String |  Backup Id | None |
-| path | String | Path | /backup/ |
-| makeItCompatible | Bool | If the backup is compatible, it will create a valid backup file (.axbs1) | false |
 
 #### Result
 
-| Result Params | Type | Explication | 
-| ----- |------| ------- |
-| isBackupFile | Bool | If the file is a valid backup file (.axbs1) |
-| isCompatible | Bool | If the file is compatible to reformating |
-| isReformated | Bool | If the file was reformated |
-| exists | Bool | Return if file exists (If Not only exists will be in results) |
+| Result Params | Type | Explication                 | 
+| ----- |------|-----------------------------|
+ | isValidBackupFile | Bool | Is Valid Backup File        |
+| isOldTimer | Bool | Is Old Timer (axbs1 format) |
+| version | Number / Null | Version of the backup |
+| convertible | Bool | Is the file convertible to axbs2 |
 
 ### Make Backup File Compatible
 ```js
-const backup = require('discord-backup-system');
+const BackupSystem = require('discord-backup-system');
 
+client.BackupSystem = new BackupSystem("/backups/");
 // ... 
 // Your Message Event / Command
-backup.makeBackupFileCompatible(backup_id, '/backup/', true);
+client.BackupSystem.convertBackup(backup_id);
 ```
 
 #### Usage
@@ -210,14 +183,13 @@ backup.makeBackupFileCompatible(backup_id, '/backup/', true);
 | Usage Params | Type | Explication | Default |
 | ----- |------| ------- | ----- |
 | backup_id | String |  Backup Id | None |
-| path | String | Path | /backup/ |
-| deleteOld | Bool | If the backup is compatible, it will create a valid backup file (.axbs1) | true |
 
 #### Result
 
-| Result Params | Type | Explication | 
-| ----- |------| ------- |
-| reformated | Bool | Is the file was reformated |
-| deletedOld | Bool | If the old backup file was deleted |
-| exists | Bool | Return if file exists (If Not only exists will be in results) |
+| Result Params | Type | Explication                        | 
+| ----- |------|------------------------------------|
+| id | String | Backup Id                          |
+| path | String | Backup Path (Path/backup_id.axbs2) |
+| backup | Backup | Backup Data                      |
+
 
