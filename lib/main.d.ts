@@ -1,4 +1,4 @@
-import { Guild, Permissions, RoleManager, SystemChannelFlags, UserFlags, GuildChannelManager, GuildEmojiManager, GuildBanManager, RoleTagData, GuildMemberManager } from "discord.js";
+import { Guild, RoleManager, GuildChannelManager, GuildEmojiManager, GuildBanManager, RoleTagData, GuildMemberManager, ChannelType, UserFlagsBitField, PermissionsBitField, OverwriteType, ThreadChannelType, GuildVerificationLevel, GuildExplicitContentFilter, GuildDefaultMessageNotifications, SystemChannelFlagsBitField } from "discord.js";
 export declare class BackupSystem {
     readonly path: string;
     constructor(path?: string);
@@ -76,12 +76,12 @@ export interface Backup {
         splash: string | null;
         afkTimeout: number;
         afkChannelID: string | null;
-        systemChannelFlags: Readonly<SystemChannelFlags>;
+        systemChannelFlags: Readonly<SystemChannelFlagsBitField>;
         systemChannelID: string | null;
-        verificationLevel: number | "NONE" | "LOW" | "MEDIUM" | "HIGH" | "VERY_HIGH";
-        explicitContentFilter: number | "DISABLED" | "MEMBERS_WITHOUT_ROLES" | "ALL_MEMBERS";
+        verificationLevel: GuildVerificationLevel | null;
+        explicitContentFilter: GuildExplicitContentFilter | null;
         mfaLevel: "NONE" | "ELEVATED" | number;
-        defaultMessageNotifications: number | "ALL_MESSAGES" | "ONLY_MENTIONS";
+        defaultMessageNotifications: GuildDefaultMessageNotifications | null;
         vanityURLCode: string | null;
         description: string | null;
         rulesChannelID: string | null;
@@ -99,7 +99,7 @@ export interface BackupRole {
     color: number;
     hoist: boolean;
     rawPosition: number;
-    permissions: Readonly<Permissions>;
+    permissions: Readonly<PermissionsBitField>;
     managed: boolean;
     mentionable: boolean;
     members: RoleMember[];
@@ -108,11 +108,11 @@ export interface BackupRole {
 }
 export interface RoleMember {
     id: string;
-    flags: Readonly<UserFlags> | null;
+    flags: Readonly<UserFlagsBitField> | null;
 }
 export interface BackupChannel {
     id: string;
-    type: "GUILD_CATEGORY" | "GUILD_NEWS" | "GUILD_STAGE_VOICE" | "GUILD_STORE" | "GUILD_TEXT" | "GUILD_VOICE";
+    type: ChannelType.GuildCategory | ChannelType.GuildNews | ChannelType.GuildStageVoice | ChannelType.GuildText | ChannelType.GuildVoice;
     name: string;
     rawPosition: number;
     parentID: string | null;
@@ -126,9 +126,9 @@ export interface BackupChannel {
 }
 export interface PermissionOverwrites {
     id: string;
-    type: "role" | "member";
-    deny: Readonly<Permissions>;
-    allow: Readonly<Permissions>;
+    type: OverwriteType;
+    deny: Readonly<PermissionsBitField>;
+    allow: Readonly<PermissionsBitField>;
 }
 export interface Emoji {
     name: string;
@@ -142,7 +142,7 @@ export interface Ban {
 }
 export interface Thread {
     id: string;
-    type: "GUILD_NEWS_THREAD" | "GUILD_PUBLIC_THREAD" | "GUILD_PRIVATE_THREAD";
+    type: ThreadChannelType;
     name: string;
     ownerId: string | null;
     joinable: boolean;

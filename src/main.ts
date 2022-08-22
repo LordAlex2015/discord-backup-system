@@ -2,14 +2,23 @@ import {
     Guild,
     Permissions,
     RoleManager,
-    SystemChannelFlags,
     UserFlags,
     Role,
     GuildChannelManager,
     TextChannel,
     ThreadChannel,
     GuildEmojiManager,
-    GuildBanManager, RoleTagData, GuildMemberManager
+    GuildBanManager,
+    RoleTagData,
+    GuildMemberManager,
+    ChannelType,
+    UserFlagsBitField,
+    PermissionsBitField,
+    OverwriteType,
+    ThreadChannelType,
+    GuildVerificationLevel,
+    GuildExplicitContentFilter,
+    GuildDefaultMessageNotifications, SystemChannelFlagsBitField
 } from "discord.js";
 import {existsSync, readFile, statSync, unlink, writeFile} from "fs";
 import {dirname} from "path";
@@ -146,15 +155,16 @@ export class BackupSystem {
             for(const category of categories.sort((a, b) => a.rawPosition - b.rawPosition)) {
                 setTimeout(async () => {
                     for(const perms of category.permissionsOverwrites) {
-                        if(perms.type === "role") {
+                        if(perms.type === OverwriteType.Role) {
                             const indx = category.permissionsOverwrites.findIndex((perm) => perm.id === perms.id);
                             if(!roleCorrespondence.get(perms.id)) continue;
                             perms.id = <string>roleCorrespondence.get(perms.id)
                             category.permissionsOverwrites[indx] = perms;
                         }
                     }
-                    let channel = await channelManager.create(category.name, {
-                        type: "GUILD_CATEGORY",
+                    let channel = await channelManager.create({
+                        name: category.name,
+                        type: ChannelType.GuildCategory,
                         permissionOverwrites: category.permissionsOverwrites,
                         nsfw: category.nsfw,
                         topic: category.topic,
@@ -175,7 +185,7 @@ export class BackupSystem {
                 setTimeout(async () => {
                     let categoryId = categoriesCorrespondence.get(<string>channel.parentID);
                     for(const perms of channel.permissionsOverwrites) {
-                        if(perms.type === "role") {
+                        if(perms.type === OverwriteType.Role) {
                             const indx = channel.permissionsOverwrites.findIndex((perm) => perm.id === perms.id);
                             if(!roleCorrespondence.get(perms.id)) continue;
                             perms.id = <string>roleCorrespondence.get(perms.id)
@@ -231,9 +241,8 @@ export class BackupSystem {
         return new Promise((resolve) => {
             emotes.forEach((emoji) => {
                 setTimeout(async () => {
-                    await emojiManager.create(emoji.url, emoji.name, {
-                        roles: emoji.roles
-                    }).catch(() => {})
+                    await emojiManager.create({attachment:emoji.url, name: emoji.name, roles: emoji.roles
+                }).catch(() => {})
                 }, interval)
             })
             resolve()
@@ -323,9 +332,9 @@ export class BackupSystem {
                             }
                             // create categories
                             rolesCorrespondence.set(backup.guild._id, guild.id)
-                            this.createCategories(backup.channels.filter((c) => c.type === "GUILD_CATEGORY"), guild.channels, rolesCorrespondence).then((categoriesCorrespondence) => {
+                            this.createCategories(backup.channels.filter((c) => c.type === ChannelType.GuildCategory), guild.channels, rolesCorrespondence).then((categoriesCorrespondence) => {
                                 // create channels
-                                this.createChannels(backup.channels.filter((c) => c.type === "GUILD_TEXT" || c.type === "GUILD_NEWS" || c.type === "GUILD_VOICE"), guild.channels, categoriesCorrespondence, rolesCorrespondence)
+                                this.createChannels(backup.channels.filter((c) => c.type === ChannelType.GuildText || c.type === ChannelType.GuildNews || c.type === ChannelType.GuildVoice), guild.channels, categoriesCorrespondence, rolesCorrespondence)
                             })
                         })
                         break;
@@ -746,12 +755,12 @@ export interface Backup {
         splash: string | null,
         afkTimeout: number,
         afkChannelID: string | null,
-        systemChannelFlags: Readonly<SystemChannelFlags>,
+        systemChannelFlags: Readonly<SystemChannelFlagsBitField>,
         systemChannelID: string | null,
-        verificationLevel: number | "NONE" | "LOW" | "MEDIUM" | "HIGH" | "VERY_HIGH",
-        explicitContentFilter: number | "DISABLED" | "MEMBERS_WITHOUT_ROLES" | "ALL_MEMBERS",
+        verificationLevel: GuildVerificationLevel | null,
+        explicitContentFilter: GuildExplicitContentFilter | null,
         mfaLevel: "NONE" | "ELEVATED" | number,
-        defaultMessageNotifications: number | "ALL_MESSAGES" | "ONLY_MENTIONS",
+        defaultMessageNotifications: GuildDefaultMessageNotifications | null,
         vanityURLCode: string | null,
         description: string | null,
         rulesChannelID: string | null,
@@ -779,10 +788,10 @@ interface OldBackup {
     region: string,
     afkTimeout: number,
     afkChannelID: string | null,
-    systemChannelFlags: Readonly<SystemChannelFlags>,
+    systemChannelFlags: Readonly<SystemChannelFlagsBitField>,
     systemChannelID: string | null,
-    verificationLevel: number | "NONE" | "LOW" | "MEDIUM" | "HIGH" | "VERY_HIGH",
-    explicitContentFilter: number | "DISABLED" | "MEMBERS_WITHOUT_ROLES" | "ALL_MEMBERS",
+    verificationLevel: GuildVerificationLevel | null,
+    explicitContentFilter: GuildExplicitContentFilter | null,
     mfaLevel: number,
     defaultMessageNotifications: number | any,
     vanityURLCode: string | null,
@@ -803,7 +812,7 @@ export interface BackupRole {
     color: number,
     hoist: boolean,
     rawPosition: number,
-    permissions: Readonly<Permissions>,
+    permissions: Readonly<PermissionsBitField>,
     managed: boolean,
     mentionable: boolean,
     members: RoleMember[],
@@ -813,12 +822,12 @@ export interface BackupRole {
 
 export interface RoleMember {
     id: string,
-    flags: Readonly<UserFlags> | null
+    flags: Readonly<UserFlagsBitField> | null
 }
 
 export interface BackupChannel {
     id: string,
-    type: "GUILD_CATEGORY" | "GUILD_NEWS" | "GUILD_STAGE_VOICE" | "GUILD_STORE" | "GUILD_TEXT" | "GUILD_VOICE",
+    type: ChannelType.GuildCategory | ChannelType.GuildNews |ChannelType.GuildStageVoice| ChannelType.GuildText | ChannelType.GuildVoice,
     name: string,
     rawPosition: number,
     parentID: string | null,
@@ -833,9 +842,9 @@ export interface BackupChannel {
 
 export interface PermissionOverwrites {
     id: string,
-    type: "role" | "member",
-    deny: Readonly<Permissions>,
-    allow: Readonly<Permissions>
+    type: OverwriteType,
+    deny: Readonly<PermissionsBitField>,
+    allow: Readonly<PermissionsBitField>
 }
 
 export interface Emoji {
@@ -852,7 +861,7 @@ export interface Ban {
 
 export interface Thread {
     id: string,
-    type: "GUILD_NEWS_THREAD" | "GUILD_PUBLIC_THREAD" | "GUILD_PRIVATE_THREAD",
+    type: ThreadChannelType,
     name: string,
     ownerId: string | null,
     joinable: boolean,

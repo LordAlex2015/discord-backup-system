@@ -1,6 +1,6 @@
 {
   "name": "discord-backup-system",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "Discord Backup System",
   "main": "lib/main.js",
   "types": "lib/main.d.ts",
@@ -20,7 +20,7 @@
   "homepage": "https://github.com/LordAlex2015/discord-backup-system#readme",
   "devDependencies": {
     "@types/node": "^14.14.37",
-    "discord.js": "^13.10.2",
+    "discord.js": "^14.3.0",
     "fs": "*",
     "typescript": "^4.2.4"
   },
