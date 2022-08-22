@@ -16,7 +16,7 @@ import {dirname} from "path";
 
 declare const Buffer: { from: new (arg0: string) => string | NodeJS.ArrayBufferView; }
 
-module.exports = class BackupSystem {
+export class BackupSystem {
     readonly path: string;
 
     constructor(path: string = "/backup/") {
@@ -864,3 +864,5 @@ export interface Thread {
     autoArchiveDuration: number | string | null,
     archived: boolean | null
 }
+
+module.exports = BackupSystem;
