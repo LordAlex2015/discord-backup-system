@@ -1,888 +1,866 @@
-import {Collection, DefaultMessageNotifications, Guild, SystemChannelFlags, UserFlags} from 'discord.js';
-import {existsSync, readFile, statSync, unlink, writeFile, readdirSync, readFileSync} from 'fs';
-import {dirname} from 'path';
+import {
+    Guild,
+    Permissions,
+    RoleManager,
+    SystemChannelFlags,
+    UserFlags,
+    Role,
+    GuildChannelManager,
+    TextChannel,
+    ThreadChannel,
+    GuildEmojiManager,
+    GuildBanManager, RoleTagData, GuildMemberManager
+} from "discord.js";
+import {existsSync, readFile, statSync, unlink, writeFile} from "fs";
+import {dirname} from "path";
 
 declare const Buffer: { from: new (arg0: string) => string | NodeJS.ArrayBufferView; }
 
-function uuidv4(): string {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-        const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-    });
-}
-function uuid_short(): string {
-    return 'xxxxxxx-xxx-xxxxxxx'.replace(/[xy]/g, function (c) {
-        const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-    });
-}
+module.exports = class BackupSystem {
+    readonly path: string;
 
-export function createBackup(guild: Guild, creatorID: string, path: string = "/backup/", name: string = "#{GEN}#") {
-    return new Promise((resolve) => {
-        // @ts-ignore
-        if (existsSync(`${dirname(require.main.filename)}${path}${name}.axbs1`)) {
-            throw new Error("Backup already exist!")
-        }
-        //base guild
-        let guild_backup: {
-            version: number,
-            backuper: {
-                id: string,
-                owner_id: string,
-                createdAt: number,
-                creatorId: string
-            },
-            name: string,
-            icon: string | null,
-            splash: string | null,
-            discoverySplash: string | null,
-            region: string,
-            afkTimeout: number,
-            afkChannelID: string | null,
-            systemChannelFlags: Readonly<SystemChannelFlags>,
-            systemChannelID: string | null,
-            verificationLevel: string,
-            explicitContentFilter: string,
-            mfaLevel: number,
-            defaultMessageNotifications: number | DefaultMessageNotifications,
-            vanityURLCode: string | null,
-            description: string | null,
-            banner: string | null,
-            rulesChannelID: string | null,
-            publicUpdatesChannelID: string | null,
-            preferredLocale: string,
-            roles: any[],
-            channels: any[],
-            emoji: any[],
-            bans: any[]
-        } = {
-            version: 1,
-            backuper: {
-                id: guild.id,
-                owner_id: guild.ownerID,
-                createdAt: Date.now(),
-                creatorId: creatorID
-            },
-            name: guild.name,
-            icon: guild.icon,
-            splash: guild.splash,
-            discoverySplash: guild.discoverySplash,
-            region: guild.region,
-            afkTimeout: guild.afkTimeout,
-            afkChannelID: guild.afkChannelID,
-            systemChannelFlags: guild.systemChannelFlags,
-            systemChannelID: guild.systemChannelID,
-            verificationLevel: guild.verificationLevel,
-            explicitContentFilter: guild.explicitContentFilter,
-            mfaLevel: guild.mfaLevel,
-            defaultMessageNotifications: guild.defaultMessageNotifications,
-            vanityURLCode: guild.vanityURLCode,
-            description: guild.description,
-            banner: guild.banner,
-            rulesChannelID: guild.rulesChannelID,
-            publicUpdatesChannelID: guild.publicUpdatesChannelID,
-            preferredLocale: guild.preferredLocale,
-            roles: [],
-            channels: [],
-            emoji: [],
-            bans: []
-        }
-        //Roles Manager
-        guild.roles.cache.each((role) => {
-            let role_members: { id: string; flags: Readonly<UserFlags> | null; }[] = [];
-            role.members.each((member) => {
-                role_members.push({
-                    id: member.user.id,
-                    flags: member.user.flags
+    constructor(path: string = "/backup/") {
+        this.path = path.replace(/\//g, "\\");
+    }
+
+    prepareRoles(roleManager: RoleManager, guildId: string): Promise<BackupRole[]> {
+        return new Promise((resolve) => {
+            let roles: BackupRole[] = [];
+            roleManager.cache.each((role: Role) => {
+                let role_members: RoleMember[] = [];
+                role.members.each((member) => {
+                    role_members.push({
+                        id: member.user.id,
+                        flags: member.user.flags
+                    })
+                })
+                if(!role.managed && role.id !== guildId)
+                roles.push({
+                    id: role.id,
+                    name: role.name,
+                    color: role.color,
+                    hoist: role.hoist,
+                    rawPosition: role.position,
+                    permissions: role.permissions,
+                    managed: role.managed,
+                    mentionable: role.mentionable,
+                    members: role_members,
+                    tags: role.tags,
+                    icon: role.icon
                 })
             })
-            guild_backup.roles.push({
-                id: role.id,
-                name: role.name,
-                color: role.color,
-                hoist: role.hoist,
-                rawPosition: role.rawPosition,
-                permissions: role.permissions,
-                managed: role.managed,
-                mentionable: role.mentionable,
-                members: role_members,
-            })
+            resolve(roles)
         })
+    }
 
-        //Channels Manager
-        guild.channels.cache.each((channel) => {
-            let permissionsOverwrites: object[] = [];
-            channel.permissionOverwrites.each((permission) => {
-                permissionsOverwrites.push({
-                    id: permission.id,
-                    type: permission.type,
-                    deny: permission.deny,
-                    allow: permission.allow
+    prepareChannels(channelManager: GuildChannelManager): Promise<BackupChannel[]> {
+        return new Promise((resolve) => {
+            let channels: BackupChannel[] = [];
+            channelManager.cache.each((channel) => {
+                let permissionsOverwrites: PermissionOverwrites[] = [];
+                if (!(channel instanceof ThreadChannel)) {
+                    channel.permissionOverwrites.cache.each((permission) => {
+                        permissionsOverwrites.push({
+                            id: permission.id,
+                            type: permission.type,
+                            deny: permission.deny,
+                            allow: permission.allow
+                        })
+                    })
+                    let threads: Thread[] = []
+                    if ((<TextChannel>channel).threads) {
+                        (<TextChannel>channel).threads.cache.each((thread) => {
+                            threads.push({
+                                id: thread.id,
+                                type: thread.type,
+                                name: thread.name,
+                                ownerId: thread.ownerId,
+                                joinable: thread.joinable,
+                                editable: thread.editable,
+                                locked: thread.locked,
+                                parentID: thread.parentId,
+                                manageable: thread.manageable,
+                                rateLimitPerUser: thread.rateLimitPerUser,
+                                autoArchiveDuration: thread.autoArchiveDuration,
+                                archived: thread.archived
+                            })
+                        })
+                    }
+                    channels.push({
+                        id: channel.id,
+                        type: channel.type,
+                        name: channel.name,
+                        rawPosition: channel.rawPosition,
+                        parentID: channel.parentId,
+                        manageable: channel.manageable,
+                        rateLimitPerUser: (<TextChannel>channel)?.rateLimitPerUser || 0,
+                        topic: (<TextChannel>channel)?.topic || "",
+                        nsfw: (<TextChannel>channel)?.nsfw || false,
+                        permissionsOverwrites: permissionsOverwrites,
+                        threads: threads,
+                        defaultAutoArchiveDuration: (<TextChannel>channel).defaultAutoArchiveDuration
+                    })
+                }
+            });
+            resolve(channels)
+        })
+    }
+
+    prepareEmojis(emojiManager: GuildEmojiManager): Promise<Emoji[]> {
+        return new Promise((resolve) => {
+            let emojis: Emoji[] = []
+            emojiManager.cache.each((emoji) => {
+                let roles: string[] = [];
+                emoji.roles.cache.each((role) => {
+                    roles.push(role.id)
+                })
+
+                emojis.push({
+                    name: <string>emoji.name,
+                    url: emoji.url,
+                    deletable: emoji.deletable,
+                    roles: roles
                 })
             })
-
-            // @ts-ignore
-            guild_backup.channels.push({
-                id: channel.id,
-                type: channel.type,
-                name: channel.name,
-                rawPosition: channel.rawPosition,
-                parentID: channel.parentID,
-                manageable: channel.manageable,
-                // @ts-ignore
-                rateLimitPerUser: `${(channel.rateLimitPerUser ? channel.rateLimitPerUser : 0)}`,
-                // @ts-ignore
-                topic: `${(channel.topic ? channel.topic : "")}`,
-                // @ts-ignore
-                nsfw: `${(channel.nsfw ? channel.nsfw : false)}`,
-                permissionsOverwrites: permissionsOverwrites
-            })
-        });
-
-        //Emoji Manager
-        guild.emojis.cache.each((emoji) => {
-            let roles: string[] = [];
-            emoji.roles.cache.each((role) => {
-                roles.push(role.id)
-            })
-
-            guild_backup.emoji.push({
-                name: emoji.name,
-                url: emoji.url,
-                deletable: emoji.deletable,
-                roles: roles
-            })
+            resolve(emojis)
         })
+    }
 
-        //Bans Manager
-        guild.fetchBans().then(bans => {
-            bans.each(ban => {
-                guild_backup.bans.push({
+    prepareBans(banManager: GuildBanManager): Promise<Ban[]> {
+        return new Promise((resolve) => {
+            let bans: Ban[] = []
+            banManager.cache.each((ban) => {
+                bans.push({
                     id: ban.user.id,
                     reason: ban.reason
                 })
             })
+            resolve(bans)
         })
+    }
 
-        const backup_id = name.replace(/#{GEN}#/g, uuidv4()).replace(/#{GEN_SHORT}#/g, uuid_short());
-        //Create Backup
-        // @ts-ignore
-        writeFile(`${dirname(require.main.filename)}${path}${backup_id}.axbs1`, new Buffer.from(JSON.stringify(guild_backup)), 'utf8', function () {
-        });
-
-        resolve({
-            id: backup_id,
-            // @ts-ignore
-            path: `${dirname(require.main.filename)}${path}${backup_id}.axbs1`
+    createCategories(categories: BackupChannel[], channelManager: GuildChannelManager, roleCorrespondence: Map<string, string>,  interval: number = 150): Promise<Map<string, string>> {
+        return new Promise((resolve) => {
+            const categoriesCorrespondence: Map<string, string> = new Map();
+            let i = 0;
+            for(const category of categories.sort((a, b) => a.rawPosition - b.rawPosition)) {
+                setTimeout(async () => {
+                    for(const perms of category.permissionsOverwrites) {
+                        if(perms.type === "role") {
+                            const indx = category.permissionsOverwrites.findIndex((perm) => perm.id === perms.id);
+                            if(!roleCorrespondence.get(perms.id)) continue;
+                            perms.id = <string>roleCorrespondence.get(perms.id)
+                            category.permissionsOverwrites[indx] = perms;
+                        }
+                    }
+                    let channel = await channelManager.create(category.name, {
+                        type: "GUILD_CATEGORY",
+                        permissionOverwrites: category.permissionsOverwrites,
+                        nsfw: category.nsfw,
+                        topic: category.topic,
+                        rateLimitPerUser: category.rateLimitPerUser,
+                    })
+                    categoriesCorrespondence.set(category.id, channel.id)
+                    i++
+                    if(i === categories.length) resolve(categoriesCorrespondence)
+                },interval)
+            }
         })
-    })
-}
+    };
 
-export function backupInfo(backup_id: String, path: string = "/backup/") {
-    return new Promise((resolve, reject) => {
-        // @ts-ignore
-        if (!existsSync(`${dirname(require.main.filename)}${path}${backup_id}.axbs1`)) {
-            resolve({
-                exists: false
+    createChannels(channels: BackupChannel[], channelManager: GuildChannelManager, categoriesCorrespondence: Map<string, string>, roleCorrespondence: Map<string, string>, interval: number = 150): Promise<Map<string, string>> {
+        return new Promise((resolve) => {
+            const channelsCorrespondence: Map<string, string> = new Map();
+            for(const channel of channels.sort((a, b) => a.rawPosition - b.rawPosition)) {
+                setTimeout(async () => {
+                    let categoryId = categoriesCorrespondence.get(<string>channel.parentID);
+                    for(const perms of channel.permissionsOverwrites) {
+                        if(perms.type === "role") {
+                            const indx = channel.permissionsOverwrites.findIndex((perm) => perm.id === perms.id);
+                            if(!roleCorrespondence.get(perms.id)) continue;
+                            perms.id = <string>roleCorrespondence.get(perms.id)
+                            channel.permissionsOverwrites[indx] = perms;
+                        }
+                    }
+                    // @ts-ignore
+                    const channe = await channelManager.create(channel.name, {
+                        type: channel.type,
+                        nsfw: channel.nsfw,
+                        parent: categoryId,
+                        permissionOverwrites: channel.permissionsOverwrites,
+                        topic: channel.topic,
+                        rateLimitPerUser: channel.rateLimitPerUser,
+                        defaultAutoArchiveDuration: channel.defaultAutoArchiveDuration
+                    })
+                    channelsCorrespondence.set(channel.id, channe.id)
+                }, interval)
+            }
+            resolve(channelsCorrespondence)
+        })
+    };
+
+    createRoles(roles: BackupRole[], roleManager: RoleManager, membersManager: GuildMemberManager, interval: number = 150): Promise<Map<string, string>> {
+        return new Promise((resolve) => {
+            const rolesCorrespondence: Map<string, string> = new Map();
+            let i = 0;
+            for(const role of roles.sort((a, b) => b.rawPosition - a.rawPosition)) {
+                setTimeout(async () => {
+                    const roleObj = await roleManager.create({
+                        name: role.name,
+                        color: role.color,
+                        hoist: role.hoist,
+                        mentionable: role.mentionable,
+                        permissions: role.permissions,
+                        //position: role.rawPosition+1,
+                        icon: role.icon,
+                    })
+                    membersManager.cache.each((member) => {
+                        if (role.members.find(u => u.id === member.id)) {
+                            member.roles.add(roleObj)
+                        }
+                    })
+                    rolesCorrespondence.set(role.id, roleObj.id);
+                    i++;
+                    if(i === roles.length) resolve(rolesCorrespondence)
+                }, interval)
+            }
+        })
+    };
+
+    createEmojis(emotes: Emoji[], emojiManager: GuildEmojiManager, interval: number = 150): Promise<void> {
+        return new Promise((resolve) => {
+            emotes.forEach((emoji) => {
+                setTimeout(async () => {
+                    await emojiManager.create(emoji.url, emoji.name, {
+                        roles: emoji.roles
+                    }).catch(() => {})
+                }, interval)
             })
-        } else {
-            // @ts-ignore
-            const size = statSync(`${dirname(require.main.filename)}${path}${backup_id}.axbs1`).size / (1024 * 1024);
-            // @ts-ignore
-            readFile(`${dirname(require.main.filename)}${path}${backup_id}.axbs1`, 'utf8', function (err, data) {
-                if (err) return reject(err);
-                const data_json = JSON.parse(data);
+            resolve()
+        })
+    };
+
+    createBans(bans: Ban[], banManager: GuildBanManager, interval: number = 150): Promise<void> {
+        return new Promise((resolve) => {
+            bans.forEach(async (ban) => {
+                setTimeout(async () => {
+                await banManager.create(ban.id, {
+                    reason: (ban.reason || "") + " (Backup)"
+                })
+            }, interval)
+            })
+            resolve()
+        })
+    };
+
+    changeGuild(backup: Backup, guild: Guild): Promise<void> {
+        return new Promise((resolve) => {
+            if(backup.guild.name) guild.setName(backup.guild.name);
+            if(backup.guild.icon) guild.setIcon(backup.guild.icon);
+            if(backup.guild.verificationLevel) guild.setVerificationLevel(backup.guild.verificationLevel);
+            if(backup.guild.explicitContentFilter) guild.setExplicitContentFilter(backup.guild.explicitContentFilter);
+            if(backup.guild.defaultMessageNotifications) guild.setDefaultMessageNotifications(backup.guild.defaultMessageNotifications);
+            if(backup.guild.afkChannelID) guild.setAFKChannel(backup.guild.afkChannelID);
+            if(backup.guild.afkTimeout) guild.setAFKTimeout(backup.guild.afkTimeout);
+            if(backup.guild.systemChannelID) guild.setSystemChannel(backup.guild.systemChannelID);
+            if(backup.guild.rulesChannelID) guild.setRulesChannel(backup.guild.rulesChannelID);
+            if(backup.guild.publicUpdatesChannelID) guild.setPublicUpdatesChannel(backup.guild.publicUpdatesChannelID);
+            if(backup.guild.discoverySplash) guild.setDiscoverySplash(backup.guild.discoverySplash);
+            if(backup.guild.systemChannelFlags) guild.setSystemChannelFlags(backup.guild.systemChannelFlags);
+            if(backup.guild.splash) guild.setSplash(backup.guild.splash);
+            if(backup.guild.banner) guild.setBanner(backup.guild.banner);
+            resolve()
+        })
+    }
+
+    public load(backupID: string, guild: Guild, order: string = "channels_roles&create_emojis&delete_emojis&bans&guild"): Promise<Backup> {
+        return new Promise((resolve) => {
+            if(!this.verifyExistence(backupID, "axbs2")) {
+               // Check older version
+                if(!this.verifyExistence(backupID, "axbs1")) {
+                    this.createError("FILE_DOESNT_EXIST", {id: backupID})
+                } else {
+                    // Convert to new version
+                    this.convertBackup(backupID).then(() => {
+                        resolve(this.load(backupID, guild, order))
+                    })
+                }
+            } else {
+                this.getBackup(backupID).then((backup) => {
+                    this.loadBackup(<Backup>backup, guild, order).then(() => {
+                        resolve(<Backup>backup)
+                    })
+                })
+            }
+        })
+    }
+
+    private loadBackup(backup: Backup, guild: Guild, order: string = "channels_roles&create_emojis&delete_emojis&bans&guild"): Promise<void> {
+        return new Promise(async () => {
+            const orderArray = order.split("&");
+            for (const order of orderArray) {
+                switch (order) {
+                    case "channels_roles":
+                        // delete roles
+                        for (const role of guild.roles.cache.values()) {
+                            if (role.managed || !role.editable) continue;
+                            await new Promise(resolve => { setTimeout(async () => {
+                                role.delete().catch(() => {
+                                })
+                                resolve(true)
+                            }, 150)})
+                        }
+                        //while(guild.roles.cache.filter(r => !r.managed && r.id !== guild.id).size > 1) {}
+                        // create roles
+                        this.createRoles(backup.roles, guild.roles, guild.members, 150).then(async (rolesCorrespondence) => {
+                            // delete channels
+                            for (const channel of guild.channels.cache.values()) {
+                                await setTimeout(async () => {
+                                    channel.delete().catch(() => {
+                                        console.error("Error deleting channel " + channel.id)
+                                    })
+                                }, 150)
+                            }
+                            // create categories
+                            rolesCorrespondence.set(backup.guild._id, guild.id)
+                            this.createCategories(backup.channels.filter((c) => c.type === "GUILD_CATEGORY"), guild.channels, rolesCorrespondence).then((categoriesCorrespondence) => {
+                                // create channels
+                                this.createChannels(backup.channels.filter((c) => c.type === "GUILD_TEXT" || c.type === "GUILD_NEWS" || c.type === "GUILD_VOICE"), guild.channels, categoriesCorrespondence, rolesCorrespondence)
+                            })
+                        })
+                        break;
+                    case "create_emojis":
+                        // create emojis
+                        this.createEmojis(backup.emoji, guild.emojis, 150)
+                        break;
+                    case "delete_emojis":
+                        // delete emojis
+                        guild.emojis.cache.forEach((emoji) => {
+                            setTimeout(async () => {
+                                emoji.delete();
+                            }, 150)
+                        })
+                        break;
+                    case "bans":
+                        // create bans
+                        this.createBans(backup.bans, guild.bans, 150)
+                        break;
+                    case "guild":
+                        // change guild
+                        this.changeGuild(backup, guild)
+                        break;
+                }
+            }
+        })
+    }
+
+    uuidv4(): string {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+            const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    }
+
+    uuid_short(): string {
+        return 'xxxxxxx-xxx-xxxxxxx'.replace(/[xy]/g, function (c) {
+            const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    }
+
+    public create(guild: Guild, creatorID: string,  name: string = "#{GEN}#"): Promise<{ id: string, path: string, backup: Backup }> {
+        return new Promise(async (resolve) => {
+            const backup_id = name.replace(/#{GEN}#/g, this.uuidv4()).replace(/#{GEN_SHORT}#/g, this.uuid_short());
+            if (!this.verifyExistence(backup_id)) {
+                let backup: Backup = {
+                    version: 2,
+                    backuper: {
+                        id: guild.id,
+                        owner_id: guild.ownerId,
+                        createdAt: Date.now(),
+                        creatorId: creatorID
+                    },
+                    guild: {
+                        _id: guild.id,
+                        _ownerId: guild.ownerId,
+                        name: guild.name,
+                        icon: guild.icon,
+                        splash: guild.splash,
+                        discoverySplash: guild.discoverySplash,
+                        afkTimeout: guild.afkTimeout,
+                        afkChannelID: guild.afkChannelId,
+                        systemChannelFlags: guild.systemChannelFlags,
+                        systemChannelID: guild.systemChannelId,
+                        verificationLevel: guild.verificationLevel,
+                        explicitContentFilter: guild.explicitContentFilter,
+                        mfaLevel: guild.mfaLevel,
+                        defaultMessageNotifications: guild.defaultMessageNotifications,
+                        vanityURLCode: guild.vanityURLCode,
+                        description: guild.description,
+                        banner: guild.banner,
+                        rulesChannelID: guild.rulesChannelId,
+                        publicUpdatesChannelID: guild.publicUpdatesChannelId,
+                        preferredLocale: guild.preferredLocale,
+                    },
+                    roles: await this.prepareRoles(guild.roles, guild.id),
+                    channels: await this.prepareChannels(guild.channels),
+                    emoji: await this.prepareEmojis(guild.emojis),
+                    bans: await this.prepareBans(guild.bans)
+                };
+
+                writeFile(`${dirname(require.main?.filename || "/")}${this.path}${backup_id}.axbs2`, new Buffer.from(JSON.stringify(backup)), 'utf8', function () {
+                });
+
+                resolve({
+                    id: backup_id,
+                    path: `${dirname(require.main?.filename || "/")}${this.path}${backup_id}.axbs2`,
+                    backup: backup
+                })
+            } else {
+                this.createError("FILE_ALREADY_EXISTS", {id: backup_id})
+            }
+        })
+    }
+
+    public getBackupInfo(backupID: string): Promise<{ size?: number, backup_id?: string, createdAt?: number, authorId?: string, guild?: { id?: string, owner_id?: string }, exists: boolean }> {
+        return new Promise(async (resolve) => {
+            if (this.verifyExistence(backupID)) {
+                const backup = <Backup>(await this.getBackup(backupID));
+                const size = statSync(`${dirname(require.main?.filename || "/")}${this.path}${backupID}.axbs2`).size / (1024 * 1024);
                 resolve({
                     size: size,
-                    backup_id: backup_id,
-                    guild_base_id: data_json.backuper.id,
-                    createdAt: data_json.backuper.createdAt,
-                    owner_id: data_json.backuper.owner_id,
-                    author_id: data_json.backuper.creatorId,
+                    backup_id: backupID,
+                    createdAt: backup.backuper.createdAt,
+                    authorId: backup.backuper.creatorId,
+                    guild: {
+                        id: backup.guild._id,
+                        owner_id: backup.guild._ownerId,
+                    },
                     exists: true
                 })
-            })
-        }
-    })
-}
-
-export function deleteBackup(backup_id: String, path: string = "/backup/") {
-    return new Promise((resolve, reject) => {
-        // @ts-ignore
-        if (!existsSync(`${dirname(require.main.filename)}${path}${backup_id}.axbs1`)) {
-            resolve({
-                exists: false
-            })
-        } else {
-            // @ts-ignore
-            unlink(`${dirname(require.main.filename)}${path}${backup_id}.axbs1`, (err) => {
-                if (err) return reject(err);
-                resolve({
-                    backup_id: backup_id,
-                    deleted: true,
-                    exists: true
-                })
-            });
-        }
-    })
-}
-
-export function loadBackup(backup_id: String, guild: Guild, path: string = "/backup/", debug = false) {
-    return new Promise((resolve, reject) => {
-        // @ts-ignore
-        if (!existsSync(`${dirname(require.main.filename)}${path}${backup_id}.axbs1`)) {
-            resolve({
-                exists: false
-            })
-        } else {
-            // @ts-ignore
-            readFile(`${dirname(require.main.filename)}${path}${backup_id}.axbs1`, 'utf8', function (err, data) {
-                if (err) return reject(err);
-                const backup = JSON.parse(data);
-                let roles = new Collection();
-                let channels = new Collection();
-                if (debug) console.log("Deleting roles...")
-                let i = 0;
-                const max_roo = guild.roles.cache.size;
-                guild.roles.cache.each((role: { managed: any; name: string; delete: () => void; }) => {
-                    if (!role.managed && role.name !== '@everyone') {
-                        setTimeout(function () {
-                            if (debug) console.log(`Deleted ${role.name} | ${i++}/${max_roo}`)
-                            role.delete();
-                            //i++
-                            if (i === max_roo) {
-                                if (debug) console.log("PART 1.1");
-                                part1_1();
-                            }
-                        }, 300)
-                    } else {
-                        i++
-                    }
-                    if (i === max_roo) {
-                        if (debug) console.log("PART 1.1");
-                        part1_1();
-                    }
-                });
-
-                function part1_1() {
-                    let i = 0;
-                    if (debug) console.log("Creating roles...")
-                    const broles = backup.roles.sort(function (a: { rawPosition: number; }, b: { rawPosition: number; }) {
-                        return b.rawPosition - a.rawPosition;
-                    });
-                    for (const role of broles) {
-                        //console.log(`Attempt to ${role.name}`)
-                        if (!role.managed && role.name !== "@everyone") {
-                            setTimeout(function () {
-                                if (debug) console.log("Creating role...")
-                                guild.roles.create({
-                                    data: {
-                                        name: role.name,
-                                        color: role.color,
-                                        hoist: role.hoist,
-                                        mentionable: role.mentionable,
-                                        //position: role.rawPosition,
-                                        permissions: role.permissions
-                                    }
-                                }).then((new_role) => {
-                                    if (debug) console.log(`Created ${role.name} | ${i}/${broles.length}`)
-                                    roles.set(role.id, {
-                                        old_id: role.id,
-                                        new_id: new_role.id
-                                    });
-                                    i++
-                                    for (const member of role.members) {
-
-                                        if (!guild.members.cache.get(member.id)) {
-                                            continue;
-                                        } else {
-                                            setTimeout(function () {
-                                                // @ts-ignore
-                                                if (debug) console.log("Adding role")
-                                                guild.members.cache.get(member.id)?.roles?.add(new_role.id)
-                                            }, 200)
-                                        }
-                                    }
-
-                                    if (i === broles.length) {
-                                        if (debug) console.log("PART 2")
-                                        part2();
-                                    }
-                                })
-
-                            }, 400)
-                        } else if (role.name === '@everyone') {
-                            if (debug) console.log(`Passing everyone | ${i}/${broles.length}`)
-                            guild.roles.everyone.edit({
-                                permissions: role.permissions
-                            }).then((new_role) => {
-                                //console.log(`Created ${role.name}`)
-                                roles.set(role.id, {
-                                    old_id: role.id,
-                                    new_id: new_role.id
-                                });
-                                i++;
-                                if (i === broles.length) {
-                                    if (debug) console.log("PART 2")
-                                    part2();
-                                }
-                            })
-                        } else if (role.managed) {
-                            if (debug) console.log(`Passing ${role.name} | ${i}/${broles.length}`)
-                            i++
-                            if (i === broles.length) {
-                                if (debug) console.log("PART 2")
-                                part2();
-                            }
-                        }
-                        if (i === broles.length) {
-                            if (debug) console.log("PART 2")
-                            part2();
-                        }
-                    }
-                }
-
-                function part2() {
-                    if (debug) console.log("Deleting Channels...")
-                    const max_chan = guild.channels.cache.size;
-                    let io = 0;
-                    guild.channels.cache.each(channel => {
-                        if (channel.deletable) {
-                            setTimeout(function () {
-                                io++
-                                if (debug) console.log(`Deleted ${channel.name} | ${io}/${max_chan}`)
-                                channel.delete();
-                                //io++
-                                if (io === max_chan - 1) {
-                                    if (debug) console.log("PART 2.1")
-                                    part2_1();
-                                }
-                            }, 300)
-                        }
-                        if (io === max_chan - 1) {
-                            if (debug) console.log("PART 2.1")
-                            part2_1();
-                        }
-                    });
-
-                }
-
-                function part2_1() {
-                    let i = 0;
-                    // @ts-ignore
-                    const bchannels = backup.channels.sort(function (a: { rawPosition: number; }, b: { rawPosition: number; }) {
-                        return b.rawPosition - a.rawPosition;
-                    });
-                    bchannels.forEach((channel: { type: string; permissionsOverwrites: any; name: string; rawPosition: any; id: unknown; }) => {
-                        //console.log(`Attempt to ${channel.name}`)
-                        if (channel.type === "category") {
-                            setTimeout(function () {
-                                let permissions = [];
-                                for (const permission of channel.permissionsOverwrites) {
-                                    if (!roles.get(permission.id)) {
-                                        continue;
-                                    } else {
-                                        permissions.push({
-                                            // @ts-ignore
-                                            id: `${roles.get(permission.id) ? roles.get(permission.id).new_id : null}`,
-                                            type: permission.type,
-                                            allow: permission.allow,
-                                            deny: permission.deny
-                                        })
-                                    }
-                                }
-                                //console.log(`Creating ${channel.name}`)
-                                guild.channels.create(channel.name, {
-                                    // @ts-ignore
-                                    type: channel.type,
-                                    position: channel.rawPosition,
-                                    permissionOverwrites: permissions
-                                }).then((new_channel) => {
-                                    channels.set(channel.id, {
-                                        old_id: channel.id,
-                                        new_id: new_channel.id
-                                    })
-                                    i++
-                                    if (i === bchannels.length) {
-                                        if (debug) console.log("PART 2.2")
-                                        part2_2();
-                                    }
-                                })
-                            }, 400)
-                        } else {
-                            i++
-                        }
-                        if (i === bchannels.length) {
-                            if (debug) console.log("PART 2.2")
-                            part2_2();
-                        }
-                    })
-                }
-
-                function part2_2() {
-                    let i = 0;
-                    const bchannels = backup.channels.sort(function (a: { rawPosition: number; }, b: { rawPosition: number; }) {
-                        return a.rawPosition - b.rawPosition;
-                    });
-                    bchannels.forEach((channel: { type: string; permissionsOverwrites: any; parentID: unknown; name: string; rawPosition: any; topic: any; nsfw: any; bitrate: any; userLimit: any; rateLimitPerUser: string; }) => {
-                        //console.log(`Attempt to ${channel.name}`)
-                        if (channel.type !== "category") {
-                            setTimeout(function () {
-                                let permissions = [];
-                                for (const permission of channel.permissionsOverwrites) {
-                                    if (!roles.get(permission.id)) {
-                                        continue;
-                                    } else {
-                                        // @ts-ignore
-                                        permissions.push({
-                                            // @ts-ignore
-                                            id: `${roles.get(permission.id) ? roles.get(permission.id).new_id : null}`,
-                                            type: permission.type,
-                                            allow: permission.allow,
-                                            deny: permission.deny
-                                        })
-                                    }
-                                }
-                                //console.log(`Creating ${channel.name}`)
-                                let parent = null;
-                                if (channels.get(channel.parentID)) {
-                                    // @ts-ignore
-                                    parent = channels.get(channel.parentID).new_id;
-                                }
-                                if (channel.type.toLowerCase() === "news") {
-                                    channel.type = "text"
-                                }
-                                //console.log(channel.type)
-                                guild.channels.create(channel.name, {
-                                    // @ts-ignore
-                                    type: channel.type,
-                                    //position: channel.rawPosition,
-                                    topic: channel.topic,
-                                    nsfw: channel.nsfw,
-                                    bitrate: channel.bitrate,
-                                    userLimit: channel.userLimit,
-                                    rateLimitPerUser: parseInt(`${channel.rateLimitPerUser !== '' ? channel.rateLimitPerUser : 0}`),
-                                    permissionOverwrites: permissions,
-                                    parent: parent
-                                })
-                                i++
-                                if (i === bchannels.length) {
-                                    if (debug) console.log("PART 3")
-                                    part3();
-                                }
-                            }, 400)
-                        } else {
-                            i++
-
-                        }
-                        if (i === bchannels.length) {
-                            if (debug) console.log("PART 3")
-                            part3();
-                        }
-                    })
-                }
-
-                function part3() {
-                    let ie = 0;
-                    const max_emot = guild.emojis.cache.size;
-                    guild.emojis.cache.each(emoji => {
-                        if (emoji.deletable) {
-                            setTimeout(function () {
-                                emoji.delete();
-                                ie++;
-                                if (ie === max_emot - 1) {
-                                    if (debug) console.log("PART 3.1");
-                                    part3_1();
-                                }
-                            }, 100)
-                        }
-                    });
-                    if (ie === max_emot) {
-                        if (debug) console.log("PART 3.1");
-                        part3_1();
-                    }
-
-                }
-
-                function part3_1() {
-                    for (const emoji of backup.emoji) {
-                        setTimeout(function () {
-                            guild.emojis.create(emoji.url, emoji.name, {
-                                roles: emoji.roles || []
-                            })
-                        }, 100)
-                    }
-
-                    for (const ban of backup.bans) {
-                        setTimeout(function () {
-                            guild.members.ban(ban.id, {
-                                reason: ban.reason
-                            })
-                        }, 100)
-                    }
-                    let afkChannel = null;
-                    let systemChannel = null;
-                    let rulesChannel = null;
-                    let publicUpdatesChannel = null;
-                    if (channels.get(backup.afkChannelID)) {
-                        // @ts-ignore
-                        afkChannel = channels.get(backup.afkChannelID).new_id;
-                    }
-                    if (channels.get(backup.systemChannelID)) {
-                        // @ts-ignore
-                        systemChannel = channels.get(backup.systemChannelID).new_id;
-                    }
-                    if (channels.get(backup.rulesChannelID)) {
-                        // @ts-ignore
-                        rulesChannel = channels.get(backup.rulesChannelID).new_id;
-                    }
-                    if (channels.get(backup.publicUpdatesChannelID)) {
-                        // @ts-ignore
-                        publicUpdatesChannel = channels.get(backup.publicUpdatesChannelID).new_id;
-                    }
-
-                    guild.edit({
-                        name: backup.name,
-                        region: backup.region,
-                        verificationLevel: backup.verificationLevel,
-                        explicitContentFilter: backup.explicitContentFilter,
-                        afkChannel: afkChannel,
-                        systemChannel: systemChannel,
-                        afkTimeout: backup.afkTimeout,
-                        icon: backup.icon,
-                        splash: backup.splash,
-                        discoverySplash: backup.discoverySplash,
-                        banner: backup.banner,
-                        defaultMessageNotifications: backup.defaultMessageNotifications,
-                        systemChannelFlags: backup.systemChannelFlags,
-                        rulesChannel: rulesChannel,
-                        publicUpdatesChannel: publicUpdatesChannel,
-                        preferredLocale: backup.preferredLocale
-                    })
-
-                    resolve({
-                        backup_id: backup_id,
-                        reversed_roles: roles,
-                        reversed_channels: channels,
-                        bans: backup.bans,
-                        exists: true
-                    })
-                }
-
-            })
-        }
-    })
-}
-
-export function getBackupRAW(backup_id: String, path: string = "/backup/") {
-    return new Promise((resolve, reject) => {
-        // @ts-ignore
-        if (!existsSync(`${dirname(require.main.filename)}${path}${backup_id}.axbs1`)) {
-            resolve({
-                exists: false
-            })
-        } else {
-            // @ts-ignore
-            readFile(`${dirname(require.main.filename)}${path}${backup_id}.axbs1`, 'utf8', function (err, data) {
-                if (err) return reject(err);
-                const data_json = JSON.parse(data);
-                resolve({
-                    backup_id: backup_id,
-                    // @ts-ignore
-                    path: `${dirname(require.main.filename)}${path}${backup_id}.axbs1`,
-                    backup: data_json,
-                    exists: true
-                })
-            })
-        }
-    })
-}
-
-export function getAllBackups(path: string = '/backup/') {
-    return new Promise(resolve => {
-        // @ts-ignore
-        const files = readdirSync(`${dirname(require.main.filename)}${path}`);
-        if (files.length < 1) {
-            resolve({backups: [], time_elapsed: 0, fetched_backups: 0})
-        } else {
-        let backups: {
-            backup_id: string;
-            // @ts-ignore
-            path: string; guild_base_id: string; createdAt: string; owner_id: string; author_id: string; size: number;
-        }[] = [];
-        const start = Date.now()
-        let count = 0
-        let count2 = 0
-        let count3 = 0
-            files.forEach((e) => {
-                try {
-                    const fileName = e.split('.')[0];
-                    if (e.endsWith('axbs1')) {
-                        // @ts-ignore
-                        const size = statSync(`${dirname(require.main.filename)}${path}${fileName}.axbs1`).size / (1024 * 1024);
-                        // @ts-ignore
-                        readFile(`${dirname(require.main.filename)}${path}${fileName}.axbs1`, 'utf8', function (err, data) {
-                            if (err) return console.error(err);
-                            const data_json = JSON.parse(data);
-                            backups.push({
-                                backup_id: fileName,
-                                // @ts-ignore
-                                path: `${dirname(require.main.filename)}${path}${fileName}.axbs1`,
-                                guild_base_id: data_json.backuper.id,
-                                createdAt: data_json.backuper.createdAt,
-                                owner_id: data_json.backuper.owner_id,
-                                author_id: data_json.backuper.creatorId,
-                                size: size
-                            })
-                            count++
-                            count2++
-                            if (count2 === files.length) {
-                                const finish = Date.now()
-                                resolve({
-                                    backups: backups,
-                                    time_elapsed: finish - start,
-                                    fetched_backups: count,
-                                })
-                            }
-                        })
-                    } else {
-                        count2++
-                    }
-                    if (count2 === files.length) {
-                        const finish = Date.now()
-                        resolve({
-                            backups: backups,
-                            time_elapsed: finish - start,
-                            fetched_backups: count,
-                        })
-                    }
-                } catch (error) {
-                    throw new Error(`Failed to fetch file ${e}: ${error.stack || error}`)
-                }
-            });
-        }
-    })
-}
-
-export function isBackupFile(backup_id: string, path: string = '/backup/', makeItCompatible: boolean = false) {
-    return new Promise((resolve, reject) => {
-        let extension = "absx1";
-        // @ts-ignore
-        if (!existsSync(`${dirname(require.main.filename)}${path}${backup_id}.axbs1`)) {
-            // @ts-ignore
-            if (!existsSync(`${dirname(require.main.filename)}${path}${backup_id}.json`)) {
+            } else {
                 resolve({
                     exists: false
                 })
-            } else {
-                extension = "json";
-            }
-        }
-        // @ts-ignore
-        readFile(`${dirname(require.main.filename)}${path}${backup_id}.${extension}`, 'utf8', async (err, data) => {
-            if (err) return reject(err);
-            const data_json = JSON.parse(data);
-            const isB = await INTERNAL_isBackupFile(data_json);
-            if(isB.isActualBackup) {
-                if(extension === "json") {
-                    if(makeItCompatible) {
-                        await makeBackupFileCompatible(backup_id, path).then(r => {
-                            if(r.reformated) {
-                                resolve({
-                                    isBackupFile: false,
-                                    isCompatible: true,
-                                    isReformated: true,
-                                    exists: true
-                                })
-                            }
-                        })
-                    } else {
-                        resolve({
-                            isBackupFile: false,
-                            isCompatible: true,
-                            isReformated: false,
-                            exists: true
-                        })
-                    }
-                } else {
-                    resolve({
-                        isBackupFile: true,
-                        isCompatible: true,
-                        isReformated: false,
-                        exists: true
-                    })
-                }
-            } else if(isB.isReformatable) {
-                if(makeItCompatible) {
-                    await makeBackupFileCompatible(backup_id, path).then(r => {
-                        if(r.reformated) {
-                            resolve({
-                                isBackupFile: false,
-                                isCompatible: true,
-                                isReformated: true,
-                                exists: true
-                            })
-                        }
-                    })
-                } else {
-                    resolve({
-                        isBackupFile: false,
-                        isCompatible: true,
-                        isReformated: false,
-                        exists: true
-                    })
-                }
             }
         })
-    })
-}
+    }
 
-export function makeBackupFileCompatible(backup_id: string, path: string = '/backup/', deleteOld: boolean = true): Promise<{reformated: boolean, deletedOld: boolean, exists: boolean}> {
-    return new Promise((resolve, reject) => {
-        let extension = "absx1";
-        // @ts-ignore
-        if (!existsSync(`${dirname(require.main.filename)}${path}${backup_id}.axbs1`)) {
-            // @ts-ignore
-            if (!existsSync(`${dirname(require.main.filename)}${path}${backup_id}.json`)) {
-                resolve({
-                    reformated: false,
-                    deletedOld: false,
-                    exists: false
-                })
-            } else {
-                extension = "json";
-            }
-        }
-        // @ts-ignore
-        readFile(`${dirname(require.main.filename)}${path}${backup_id}.${extension}`, 'utf8', async (err, data) => {
-            if (err) return reject(err);
-            const data_json = JSON.parse(data);
-            const isB = await INTERNAL_isBackupFile(data_json);
-            if(isB.isReformatable) {
-                Object.assign({version: 1}, data_json);
-                // @ts-ignore
-                writeFile(`${dirname(require.main.filename)}${path}${backup_id}.axbs1`, new Buffer.from(JSON.stringify(data_json)), 'utf8', function () {
+    public deleteBackup(backupID: string): Promise<{ backup_id: string, deleted: boolean, exists: boolean }> {
+        return new Promise((resolve, reject) => {
+            if (this.verifyExistence(backupID)) {
+                unlink(`${dirname(require.main?.filename || "/")}${this.path}${backupID}.axbs2`, (err) => {
+                    if (err) return reject(err);
+                    resolve({
+                        backup_id: backupID,
+                        deleted: true,
+                        exists: true
+                    })
                 });
-                if(deleteOld) {
-                    // @ts-ignore
-                    unlink(`${dirname(require.main.filename)}${path}${backup_id}.json`, (err) => {
-                        if (err) return reject(err);
-                    });
+            } else {
+                this.createError("FILE_DOESNT_EXIST", {id: backupID})
+            }
+        })
+    }
+
+    public isBackupFile(backupID: string): Promise<{ isValidBackupFile: boolean, isOldTimer: boolean, version: number | null, convertible: boolean }> {
+        return new Promise(async (resolve) => {
+            if (this.verifyExistence(backupID)) {
+                // V2
+                const backupContent = await this.getBackup(backupID);
+                if (await this.isV2BackupFile(backupContent)) {
                     resolve({
-                        reformated: true,
-                        deletedOld: true,
-                        exists: true
+                        isValidBackupFile: true,
+                        isOldTimer: false,
+                        version: 2,
+                        convertible: false
+                    })
+                } else {
+                    resolve({
+                        isValidBackupFile: false,
+                        isOldTimer: false,
+                        version: null,
+                        convertible: false
                     })
                 }
-                resolve({
-                    reformated: true,
-                    deletedOld: false,
-                    exists: true
-                })
+            } else if (this.verifyExistence(backupID, 'axbs1')) {
+                // V1
+                const backupContent = await this.getBackup(backupID, 'axbs1');
+                if (await this.isV1BackupFile(backupContent)) {
+                    resolve({
+                        isValidBackupFile: false,
+                        isOldTimer: true,
+                        version: 1,
+                        convertible: true
+                    })
+                } else {
+                    resolve({
+                        isValidBackupFile: false,
+                        isOldTimer: false,
+                        version: null,
+                        convertible: false
+                    })
+                }
             } else {
                 resolve({
-                    reformated: false,
-                    deletedOld: false,
-                    exists: true
+                    isValidBackupFile: false,
+                    isOldTimer: false,
+                    version: null,
+                    convertible: false
                 })
             }
         })
-    })
-}
+    }
 
-/**
- * @param {Object} backup_content
- * @return Promise<Object>
- */
-function INTERNAL_isBackupFile(backup_content: Object): Promise<{isActualBackup: boolean, isReformatable: boolean | undefined}> {
-    return new Promise((resolve) => {
-        const proof_object = {
-            version: null,
-            backuper: {
-                id: null,
-                owner_id: null,
-                createdAt: null,
-                creatorId: null
-            },
-            name: null,
-            icon: null,
-            splash: null,
-            discoverySplash: null,
-            region: null,
-            afkTimeout: null,
-            afkChannelID: null,
-            systemChannelFlags: null,
-            systemChannelID: null,
-            verificationLevel: null,
-            explicitContentFilter: null,
-            mfaLevel: null,
-            defaultMessageNotifications: null,
-            vanityURLCode: null,
-            description: null,
-            banner: null,
-            rulesChannelID: null,
-            publicUpdatesChannelID: null,
-            preferredLocale: null,
-            roles: null,
-            channels: null,
-            emoji: null,
-            bans: null
-        };
-        const proof_object_without_version = {
-            backuper: {
-                id: null,
-                owner_id: null,
-                createdAt: null,
-                creatorId: null
-            },
-            name: null,
-            icon: null,
-            splash: null,
-            discoverySplash: null,
-            region: null,
-            afkTimeout: null,
-            afkChannelID: null,
-            systemChannelFlags: null,
-            systemChannelID: null,
-            verificationLevel: null,
-            explicitContentFilter: null,
-            mfaLevel: null,
-            defaultMessageNotifications: null,
-            vanityURLCode: null,
-            description: null,
-            banner: null,
-            rulesChannelID: null,
-            publicUpdatesChannelID: null,
-            preferredLocale: null,
-            roles: null,
-            channels: null,
-            emoji: null,
-            bans: null
-        };
-
-        if (!INTERNAL_hasSameProps(backup_content, proof_object_without_version)) {
-            if (!INTERNAL_hasSameProps(backup_content, proof_object)) {
+    public convertBackup(backupID: string): Promise<{ id: string, path: string, backup: Backup }> {
+        return new Promise(async resolve => {
+            if ((await this.isBackupFile(backupID)).convertible) {
+                const backup = await this.getBackup(backupID, 'axbs1');
+                const newBackup = this.convert(<OldBackup>backup);
+                unlink(`${dirname(require.main?.filename || "/")}${this.path}${backupID}.axbs1`, () => {
+                })
+                writeFile(`${dirname(require.main?.filename || "/")}${this.path}${backupID}.axbs2`, new Buffer.from(JSON.stringify(newBackup)), 'utf8', function () {
+                });
                 resolve({
-                    isActualBackup: false,
-                    isReformatable: false
+                    id: backupID,
+                    path: `${dirname(require.main?.filename || "/")}${this.path}${backupID}.axbs2`,
+                    backup: newBackup
                 })
             } else {
-                resolve({
-                    isActualBackup: true,
-                    isReformatable: undefined
-                })
+                this.createError('UNCONVERTIBLE_BACKUP');
             }
-        } else {
-            resolve({
-                isActualBackup: false,
-                isReformatable: true
-            })
+        })
+    }
+
+    private convert(oldBackup: OldBackup): Backup {
+        let newBackup: Backup = {
+            version: 2,
+            backuper: oldBackup.backuper,
+            guild: {
+                name: oldBackup.name,
+                _id: oldBackup.backuper.id,
+                _ownerId: oldBackup.backuper.owner_id,
+                icon: oldBackup.icon,
+                splash: oldBackup.splash,
+                discoverySplash: oldBackup.discoverySplash,
+                afkTimeout: oldBackup.afkTimeout,
+                afkChannelID: oldBackup.afkChannelID,
+                systemChannelFlags: oldBackup.systemChannelFlags,
+                systemChannelID: oldBackup.systemChannelID,
+                verificationLevel: oldBackup.verificationLevel,
+                explicitContentFilter: oldBackup.explicitContentFilter,
+                mfaLevel: oldBackup.mfaLevel,
+                defaultMessageNotifications: oldBackup.defaultMessageNotifications,
+                vanityURLCode: oldBackup.vanityURLCode,
+                description: oldBackup.description,
+                banner: oldBackup.banner,
+                rulesChannelID: oldBackup.rulesChannelID,
+                publicUpdatesChannelID: oldBackup.publicUpdatesChannelID,
+                preferredLocale: oldBackup.preferredLocale
+            },
+            roles: [],
+            channels: [],
+            bans: oldBackup.bans,
+            emoji: oldBackup.emoji
         }
-    })
+        oldBackup.channels.forEach((channel) => {
+            Object.assign({threads: []}, channel)
+            newBackup.channels.push(channel)
+        })
+        oldBackup.roles.forEach((role) => {
+            Object.assign({tags: null}, role)
+            newBackup.roles.push(role)
+        })
+        return newBackup
+    }
+
+    private getBackup(backupID: string, end: string = 'axbs2'): Promise<Backup | OldBackup> {
+        return new Promise((resolve, reject) => {
+            if (this.verifyExistence(backupID, end)) {
+                readFile(`${dirname(require.main?.filename || "/")}${this.path}${backupID}.${end}`, 'utf8', function (err, data) {
+                    if (err) return reject(err);
+                    const data_json = JSON.parse(data);
+                    resolve(data_json)
+                })
+            } else {
+                this.createError("FILE_DOESNT_EXIST", {id: backupID})
+            }
+        })
+    }
+
+    private verifyExistence(id: string, end: string = 'axbs2'): boolean {
+        return !!existsSync(`${dirname(require.main?.filename || "/")}${this.path}${id}.${end}`);
+    }
+
+    private createError(error: 'FILE_ALREADY_EXISTS' | 'FILE_DOESNT_EXIST' | 'IS_NOT_BACKUP_TYPE_FILE' | 'UNCONVERTIBLE_BACKUP', other?: any): void {
+        let error_text = "UNKNOWN ERROR"
+        switch (error) {
+            case 'FILE_ALREADY_EXISTS':
+                error_text = `File ${dirname(require.main?.filename || "/")}${this.path}${other["id"]}.axbs2 already exists!`
+                break;
+            case 'FILE_DOESNT_EXIST':
+                error_text = `File ${dirname(require.main?.filename || "/")}${this.path}${other["id"]}.axbs2 doesn't exist!`
+                break;
+            case 'IS_NOT_BACKUP_TYPE_FILE':
+                error_text = `Backup ${other["id"]} is not a backup type File`
+                break;
+            case 'UNCONVERTIBLE_BACKUP':
+                error_text = `Unconvertible Backup File`
+                break;
+        }
+        throw new Error(error_text)
+    }
+
+    private isConvertible(backupContent: any): Promise<boolean | "ALREADY OPERATIONAL"> {
+        return new Promise(async (resolve) => {
+            if (backupContent.version === 1) {
+                resolve(await this.isV1BackupFile(backupContent));
+            } else if (backupContent.version === 2) {
+                if ((await this.isV2BackupFile(backupContent))) {
+                    resolve("ALREADY OPERATIONAL")
+                } else {
+                    resolve(false)
+                }
+            } else {
+                resolve(false)
+            }
+        })
+
+    }
+
+    private static findBackupVersion(backupContent: Backup): number {
+        if (backupContent.version) {
+            return backupContent.version
+        } else {
+            return -1;
+        }
+    }
+
+    private isV1BackupFile(backupContent: any): Promise<boolean> {
+        return new Promise(async (resolve) => {
+            const v1BackupContent = {
+                version: null,
+                backuper: {
+                    id: null,
+                    owner_id: null,
+                    createdAt: null,
+                    creatorId: null
+                },
+                name: null,
+                icon: null,
+                splash: null,
+                discoverySplash: null,
+                region: null,
+                afkTimeout: null,
+                afkChannelID: null,
+                systemChannelFlags: null,
+                systemChannelID: null,
+                verificationLevel: null,
+                explicitContentFilter: null,
+                mfaLevel: null,
+                defaultMessageNotifications: null,
+                vanityURLCode: null,
+                description: null,
+                banner: null,
+                rulesChannelID: null,
+                publicUpdatesChannelID: null,
+                preferredLocale: null,
+                roles: null,
+                channels: null,
+                emoji: null,
+                bans: null
+            };
+            resolve(await this.hasSameProps(backupContent, v1BackupContent))
+        })
+    }
+
+    private isV2BackupFile(backupContent: any): Promise<boolean> {
+        return new Promise(async (resolve) => {
+            const v2BackupContent = {
+                version: null,
+                backuper: {
+                    id: null,
+                    owner_id: null,
+                    createdAt: null,
+                    creatorId: null
+                },
+                guild: {
+                    _id: null,
+                    _ownerId: null,
+                    name: null,
+                    banner: null,
+                    discoverySplash: null,
+                    icon: null,
+                    splash: null,
+                    afkTimeout: null,
+                    afkChannelID: null,
+                    systemChannelFlags: null,
+                    systemChannelID: null,
+                    verificationLevel: null,
+                    explicitContentFilter: null,
+                    mfaLevel: null,
+                    defaultMessageNotifications: null,
+                    vanityURLCode: null,
+                    description: null,
+                    rulesChannelID: null,
+                    publicUpdatesChannelID: null,
+                    preferredLocale: null,
+                },
+                roles: null,
+                channels: null,
+                emoji: null,
+                bans: null,
+            };
+            resolve(await this.hasSameProps(backupContent, v2BackupContent))
+        })
+    }
+
+    private hasSameProps(obj1: Object, obj2: Object): Promise<boolean> {
+        return new Promise((resolve) => {
+            Object.keys(obj1).every(function (prop) {
+                if (!obj2.hasOwnProperty(prop)) {
+                    resolve(false)
+                }
+            });
+            resolve(true)
+        })
+
+    }
 }
 
-function INTERNAL_hasSameProps(obj1: Object, obj2: Object) {
-    return Object.keys(obj1).every(function (prop) {
-        return obj2.hasOwnProperty(prop);
-    });
+export interface Backup {
+    version: number,
+    backuper: {
+        id: string,
+        owner_id: string,
+        createdAt: number,
+        creatorId: string
+    },
+    guild: {
+        _id: string,
+        _ownerId: string,
+        name: string,
+        banner: string | null,
+        discoverySplash: string | null,
+        icon: string | null,
+        splash: string | null,
+        afkTimeout: number,
+        afkChannelID: string | null,
+        systemChannelFlags: Readonly<SystemChannelFlags>,
+        systemChannelID: string | null,
+        verificationLevel: number | "NONE" | "LOW" | "MEDIUM" | "HIGH" | "VERY_HIGH",
+        explicitContentFilter: number | "DISABLED" | "MEMBERS_WITHOUT_ROLES" | "ALL_MEMBERS",
+        mfaLevel: "NONE" | "ELEVATED" | number,
+        defaultMessageNotifications: number | "ALL_MESSAGES" | "ONLY_MENTIONS",
+        vanityURLCode: string | null,
+        description: string | null,
+        rulesChannelID: string | null,
+        publicUpdatesChannelID: string | null,
+        preferredLocale: string,
+    },
+    roles: BackupRole[],
+    channels: BackupChannel[],
+    emoji: Emoji[],
+    bans: Ban[],
+}
+
+interface OldBackup {
+    version: number,
+    backuper: {
+        id: string,
+        owner_id: string,
+        createdAt: number,
+        creatorId: string
+    },
+    name: string,
+    icon: string | null,
+    splash: string | null,
+    discoverySplash: string | null,
+    region: string,
+    afkTimeout: number,
+    afkChannelID: string | null,
+    systemChannelFlags: Readonly<SystemChannelFlags>,
+    systemChannelID: string | null,
+    verificationLevel: number | "NONE" | "LOW" | "MEDIUM" | "HIGH" | "VERY_HIGH",
+    explicitContentFilter: number | "DISABLED" | "MEMBERS_WITHOUT_ROLES" | "ALL_MEMBERS",
+    mfaLevel: number,
+    defaultMessageNotifications: number | any,
+    vanityURLCode: string | null,
+    description: string | null,
+    banner: string | null,
+    rulesChannelID: string | null,
+    publicUpdatesChannelID: string | null,
+    preferredLocale: string,
+    roles: any[],
+    channels: any[],
+    emoji: any[],
+    bans: any[]
+}
+
+export interface BackupRole {
+    id: string,
+    name: string,
+    color: number,
+    hoist: boolean,
+    rawPosition: number,
+    permissions: Readonly<Permissions>,
+    managed: boolean,
+    mentionable: boolean,
+    members: RoleMember[],
+    tags: RoleTagData | null,
+    icon: string | null
+}
+
+export interface RoleMember {
+    id: string,
+    flags: Readonly<UserFlags> | null
+}
+
+export interface BackupChannel {
+    id: string,
+    type: "GUILD_CATEGORY" | "GUILD_NEWS" | "GUILD_STAGE_VOICE" | "GUILD_STORE" | "GUILD_TEXT" | "GUILD_VOICE",
+    name: string,
+    rawPosition: number,
+    parentID: string | null,
+    manageable: boolean,
+    rateLimitPerUser: number,
+    topic: string
+    nsfw: boolean,
+    permissionsOverwrites: PermissionOverwrites[],
+    threads?: Thread[],
+    defaultAutoArchiveDuration?: number | string,
+}
+
+export interface PermissionOverwrites {
+    id: string,
+    type: "role" | "member",
+    deny: Readonly<Permissions>,
+    allow: Readonly<Permissions>
+}
+
+export interface Emoji {
+    name: string,
+    url: string,
+    deletable: boolean,
+    roles: string[]
+}
+
+export interface Ban {
+    id: string,
+    reason: string | null | undefined
+}
+
+export interface Thread {
+    id: string,
+    type: "GUILD_NEWS_THREAD" | "GUILD_PUBLIC_THREAD" | "GUILD_PRIVATE_THREAD",
+    name: string,
+    ownerId: string | null,
+    joinable: boolean,
+    editable: boolean,
+    locked: boolean | null,
+    parentID: string | null,
+    manageable: boolean,
+    rateLimitPerUser: number | null,
+    autoArchiveDuration: number | string | null,
+    archived: boolean | null
 }
