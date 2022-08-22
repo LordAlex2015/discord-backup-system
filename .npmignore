@@ -1,3 +1,4 @@
 src/
 bot.js
 node_modules
+.idea

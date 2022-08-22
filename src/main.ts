@@ -192,15 +192,16 @@ export class BackupSystem {
                             channel.permissionsOverwrites[indx] = perms;
                         }
                     }
-                    // @ts-ignore
-                    const channe = await channelManager.create(channel.name, {
+
+                    const channe = await channelManager.create({
+                        name: channel.name,
                         type: channel.type,
                         nsfw: channel.nsfw,
                         parent: categoryId,
                         permissionOverwrites: channel.permissionsOverwrites,
                         topic: channel.topic,
                         rateLimitPerUser: channel.rateLimitPerUser,
-                        defaultAutoArchiveDuration: channel.defaultAutoArchiveDuration
+                        //defaultAutoArchiveDuration: channel.defaultAutoArchiveDuration
                     })
                     channelsCorrespondence.set(channel.id, channe.id)
                 }, interval)

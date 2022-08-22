@@ -1,6 +1,6 @@
 {
   "name": "discord-backup-system",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "description": "Discord Backup System",
   "main": "lib/main.js",
   "types": "lib/main.d.ts",
