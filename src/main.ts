@@ -193,7 +193,7 @@ export class BackupSystem {
                         }
                     }
 
-                    const channe = await channelManager.create({
+                    const ch = await channelManager.create({
                         name: channel.name,
                         type: channel.type,
                         nsfw: channel.nsfw,
@@ -203,7 +203,7 @@ export class BackupSystem {
                         rateLimitPerUser: channel.rateLimitPerUser,
                         //defaultAutoArchiveDuration: channel.defaultAutoArchiveDuration
                     })
-                    channelsCorrespondence.set(channel.id, channe.id)
+                    channelsCorrespondence.set(channel.id, ch.id)
                 }, interval)
             }
             resolve(channelsCorrespondence)
